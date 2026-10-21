@@ -77,3 +77,9 @@ It may not be perfect, and it certainly has room to grow. But if it solves a pro
 **Use it, experiment with it, improve it, fork it, and make it your own, because it does not belong to me.**
 
 Thanks for taking a look at Kollage.
+
+<p float="left">
+  <img src="https://i.8upload.com/image/e75bdf4a2ccee8f2/preview1.png" width="500"/>
+  <img src="https://i.8upload.com/image/db00433a9ccbbbec/preview2.png" width="500"/>
+
+</p>
