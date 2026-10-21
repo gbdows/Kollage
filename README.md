@@ -49,6 +49,8 @@ I also want to be transparent about the project's limitations. I cannot guarante
 
 **My position on AI is neutral.** I am neither against it nor unconditionally in favor of it. I see it as a tool, and Kollage is one example of how I used it to address a practical problem.
 
+As for the logo, I’m not the best at making them but i made it on my own on this tool, it’s meant to be a K with a G drawn over it using a brush (KollaGe) and yeah... I don't really know if it looks good but we have a logo!
+
 ## Let's be clear
 
 I want to be clear about one thing: **Kollage started as a personal project, not as a commitment to maintain a fully featured image editor for everyone.**
