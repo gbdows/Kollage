@@ -1,4 +1,5 @@
 # Kollage
+<img src="https://i.8upload.com/image/2f572997922b29b4/logo-kollage-1200.png" width="200">
 
 Kollage is a lightweight browser-based image editing application built with HTML, CSS and JavaScript. It was created to address a personal need: being able to work with `.pdn` files on Linux while enjoying an interface and workflow as close as possible to [Paint.NET](https://www.getpaint.net/).
 
