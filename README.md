@@ -82,7 +82,9 @@ It may not be perfect, and it certainly has room to grow. But if it solves a pro
 Thanks for taking a look at Kollage.
 
 <p float="left">
-  <img src="https://i.8upload.com/image/e75bdf4a2ccee8f2/preview1.png" width="500"/>
-  <img src="https://i.8upload.com/image/db00433a9ccbbbec/preview2.png" width="500"/>
+  <img src="https://i.8upload.com/image/3add4419b423e0c4/screenshot-2026-10-22-13-50-31-164.jpg" width="500"/>
+  <img src="https://i.8upload.com/image/5e9018114717afee/2026-10-22-14-12-02.png" width="500"/>
+  <img src="https://i.8upload.com/image/6f5bb868da7fa873/capture-d-cran-20261022-110125.png" width="500"/>
+  <img src="https://i.8upload.com/image/6cdef82dda272377/capture-d-cran-20261022-135328.png" width="500"/>
 
 </p>
