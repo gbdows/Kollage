@@ -9,35 +9,43 @@ I'm sharing Kollage publicly in the hope that other people might find it useful 
 
 ## Features
 
-Kollage already includes a range of tools for everyday image editing and photomontage:
+Kollage includes a range of tools for everyday image editing and photomontage:
 
 - **Drawing tools:** Paintbrush, pencil, eraser, lines, geometric shapes, gradients, and text.
-- **Selections:** Rectangular and elliptical selections, freehand selection, magic wand, and pixel manipulation.
+- **Tablet and stylus support:** Pointer-based input for mouse, touch, and pen, including pressure-sensitive brush width, an optional stroke stabilizer, pinch-to-zoom, and two-finger panning.
+- **Selections:** Rectangular and elliptical selections, freehand lasso, magic wand, additive selections, and pixel manipulation.
 - **Layer management:** Create, duplicate, reorder, merge, and manage layers, including visibility, opacity, and blending modes.
-- **Image adjustments and effects:** Brightness, contrast, hue, saturation, black and white, sepia, blur, sharpening, pixelation, and other visual effects.
-- **Editing history:** Undo and redo actions while working on an image.
+- **Image adjustments and effects:** Brightness, contrast, hue, saturation, black and white, sepia, blur, sharpening, pixelation, noise reduction, and other visual effects.
+- **Editing history:** Undo and redo, with history limited to 60 states to reduce memory usage.
 - **Image transformations:** Crop, resize, flip, and rotate images.
-- **Color tools:** Color wheel, palette, color picker, and primary and secondary colors.
-- **Import and export:** Open common image formats and work with `.pdn` files. Projects can also be saved in Kollage's own `.kol` format.
-- **Workspace customization:** Zoom controls, multiple document tabs, and movable panels.
+- **Color tools:** A redesigned color window with a hue and saturation wheel, RGB and HSV sliders, alpha controls, hexadecimal color input, a palette, and a color picker.
+- **Import and export:** Open common image formats, work with `.pdn` files, import GIF frames as layers, import SVG images as raster layers, and read and write `.kra` files. Projects can also be saved in Kollage's own `.kol` format.
+- **Workspace customization:** Zoom controls, multiple document tabs, movable panels with window snapping, and a pixel grid at high zoom levels.
+- **Interface customization:** Dark theme and interface translations for English, French, Spanish, German, and Japanese.
 - **Text customization:** Font selection, font size, bold and italic styling, with support for importing fonts.
 
-Kollage is implemented using standard web technologies and can run in a compatible browser. The application is also designed so it can potentially be packaged as a desktop application.
+Kollage is built with standard web technologies and runs in a compatible browser. It is also designed so it can potentially be packaged as a desktop application.
 
 ## Current Status
 
-Kollage is usable, but it is not a finished or fully polished application. Some features may behave unexpectedly, and bugs or compatibility issues are possible.
+Kollage is usable, and version **1.3.1** adds improvements to drawing tools, selections, tablet support, the interface, file compatibility, and performance.
 
-Here are some known limitations and areas for improvement:
+However, Kollage is still a personal project rather than a fully polished, professionally maintained image editor. Some features may behave unexpectedly, and bugs or compatibility issues are possible.
 
-- **Rotation and transformations:** Some operations may produce unexpected results. Undoing the last action with `Ctrl+Z` may help recover from the issue.
-- **Pixel art:** Pixel-perfect mode exists, but it's not specifically optimized for pixel-art workflows.
-- **Extension system:** not currently functional.
-- **Translations:** Supports English and French, but additional languages and translation improvements may be desirable.
-- **Logo:** The current logo and branding are provisional and may change.
-- **Feature completeness:** Some tools still need to be tested and raffined
+Known limitations include:
 
-Compatibility with different browsers, operating systems, image formats, and existing `.pdn` files may vary. Please keep backups of important projects and exported files.
+- **Rotations and transformations:** Some operations may still produce unexpected results. Undoing the last action with `Ctrl+Z` may help recover from an issue.
+- **Pixel art:** Pixel-perfect mode and the image pixel grid are available, but Kollage is not specifically optimized for professional pixel-art workflows.
+- **Extension system:** The extension system is not currently functional. Support for extensions is planned to make it easier to add effects without modifying the original source code.
+- **Translations:** The interface supports English, French, Spanish, German, and Japanese. Some text, buttons, or dialogs may still fall back to English.
+- **KRA compatibility:** Kollage can read and write `.kra` files, but compatibility with Krita has not been fully verified. Reading has limitations: groups are flattened, and vector layers, clone layers, masks, and unsupported color spaces may not be preserved. Files saved by Kollage are written as 8-bit RGBA.
+- **SVG import:** SVG files are rasterized at the requested width onto a white background. They are not preserved as editable vector graphics.
+- **GIF import:** Importing all frames as layers requires a browser that supports `ImageDecoder`, such as a compatible version of Chrome.
+- **Feature completeness:** Some tools and workflows still need further testing and refinement.
+
+Version 1.3.1 has been tested on an Android tablet, a Windows 11 laptop, and a Fedora desktop. These tests do not guarantee compatibility with every device, browser, operating system, or file format.
+
+Please keep backups of important projects and exported files.
 
 ## A Note About How Kollage Was Created
 
