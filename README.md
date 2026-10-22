@@ -42,6 +42,7 @@ Known limitations include:
 - **SVG import:** SVG files are rasterized at the requested width onto a white background. They are not preserved as editable vector graphics.
 - **GIF import:** Importing all frames as layers requires a browser that supports `ImageDecoder`, such as a compatible version of Chrome.
 - **Feature completeness:** Some tools and workflows still need further testing and refinement.
+- **Saving on Android:** It is unfortunately currently unavailable to save files on Android.
 
 Version 1.3.1 has been tested on an Android tablet, a Windows 11 laptop, and a Fedora desktop. These tests do not guarantee compatibility with every device, browser, operating system, or file format.
 
