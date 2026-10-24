@@ -7,6 +7,8 @@ The goal was never to reinvent image editing or compete with established softwar
 
 I'm sharing Kollage publicly in the hope that other people might find it useful too.
 
+# Big update soon!
+
 ## Features
 
 Kollage includes a range of tools for everyday image editing and photomontage:
