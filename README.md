@@ -11,40 +11,59 @@ I'm sharing Kollage publicly in the hope that other people might find it useful 
 
 Kollage includes a range of tools for everyday image editing and photomontage:
 
-- **Drawing tools:** Paintbrush, pencil, eraser, lines, geometric shapes, gradients, and text.
-- **Tablet and stylus support:** Pointer-based input for mouse, touch, and pen, including pressure-sensitive brush width, an optional stroke stabilizer, pinch-to-zoom, and two-finger panning.
-- **Selections:** Rectangular and elliptical selections, freehand lasso, magic wand, additive selections, and pixel manipulation.
+- **Drawing tools:** Paintbrush, pencil, eraser, lines, polylines, geometric shapes, gradients, and text.
+- **Tablet and stylus support:** Pointer-based input for mouse, touch, and pen, including automatic activation of pressure-sensitive brushes, an optional stroke stabilizer, pinch-to-zoom, and two-finger panning.
+- **Brushes and color sampling:** Basic brush, pressure-sensitive brush, soft airbrush, pencil, adjustable smudge tool, and an improved eyedropper with a color preview.
+- **Pixel art tools:** Pixel-perfect mode, pixel grid, and built-in palettes designed for retro graphics and limited-color artwork.
+- **Selections:** Rectangular and elliptical selections, freehand lasso, magic wand, additive and subtractive selection modes, and inverted selections.
 - **Layer management:** Create, duplicate, reorder, merge, and manage layers, including visibility, opacity, and blending modes.
-- **Image adjustments and effects:** Brightness, contrast, hue, saturation, black and white, sepia, blur, sharpening, pixelation, noise reduction, and other visual effects.
-- **Editing history:** Undo and redo, with history limited to 60 states to reduce memory usage.
-- **Image transformations:** Crop, resize, flip, and rotate images.
+- **Image adjustments and effects:** Brightness, contrast, hue, saturation, black and white, sepia, blur, sharpening, pixelation, noise reduction, drop shadows, red-eye removal, and content-aware fill.
+- **Decompression and artifact reduction:** A dedicated group of filters for reducing compression artifacts, including adaptive deblocking, halo reduction, wavelet denoising, and palette-based compression with dithering.
+- **Palette management:** Built-in palettes including Game Boy, Game Boy Pocket, PICO-8, CGA, grayscale palettes, and 15-bit color. Create, extract, import, export, and apply custom palettes to images while preserving transparency.
+- **Editing history:** Undo and redo, with improved memory efficiency through shared unchanged layers and a memory limit adapted to the available machine.
+- **Image transformations:** Crop, resize, flip, rotate, and change canvas dimensions using percentages or absolute sizes, with aspect ratio controls and a 3×3 anchor grid.
 - **Color tools:** A redesigned color window with a hue and saturation wheel, RGB and HSV sliders, alpha controls, hexadecimal color input, a palette, and a color picker.
 - **Import and export:** Open common image formats, work with `.pdn` files, import GIF frames as layers, import SVG images as raster layers, and read and write `.kra` files. Projects can also be saved in Kollage's own `.kol` format.
+- **Extension system:** Install and manage JavaScript extensions, browse and search extensions, filter by keywords and authors, mark favorites, and add custom effects and menu items without modifying the original source code.
 - **Workspace customization:** Zoom controls, multiple document tabs, movable panels with window snapping, and a pixel grid at high zoom levels.
 - **Interface customization:** Dark theme and interface translations for English, French, Spanish, German, and Japanese.
 - **Text customization:** Font selection, font size, bold and italic styling, with support for importing fonts.
+- **Autosave:** Automatic saving after a period of inactivity, with the timer reset during drawing and an immediate save when the page moves into the background.
 
 Kollage is built with standard web technologies and runs in a compatible browser. It is also designed so it can potentially be packaged as a desktop application.
 
+## Performance and Technical Improvements
+
+Version 1.4.1 includes several performance and memory optimizations:
+
+- **Faster effects:** Oil painting runs up to 9 times faster. Noise reduction, emboss, swirl, relief, outlines, sharpening, and crystallize have also been optimized while preserving the previous results.
+- **Faster content-aware fill:** A 66,000-pixel lasso selection that previously took approximately 26 seconds can now be processed in less than one second.
+- **Reduced memory usage:** Unchanged layers are shared in the editing history instead of being duplicated unnecessarily. In one test, heap memory usage dropped from 979 MB to 227 MB.
+- **Adaptive memory limit:** The history system uses a memory limit adapted to the machine.
+- **Improved autosave:** Autosave waits for three seconds of inactivity, resets its timer while drawing, and saves immediately when the page moves into the background.
+
+These improvements aim to make Kollage more responsive and reduce memory consumption during longer editing sessions.
+
 ## Current Status
 
-Kollage is usable, and version **1.3.1** adds improvements to drawing tools, selections, tablet support, the interface, file compatibility, and performance.
+The latest release, **Kollage 1.4.1**, introduces a functional extension system, new image effects, palette management, improved drawing tools, and significant performance and memory optimizations.
 
 However, Kollage is still a personal project rather than a fully polished, professionally maintained image editor. Some features may behave unexpectedly, and bugs or compatibility issues are possible.
 
-Known limitations include:
+### Known Limitations
 
-- **Rotations and transformations:** Some operations may still produce unexpected results. Undoing the last action with `Ctrl+Z` may help recover from an issue.
-- **Pixel art:** Pixel-perfect mode and the image pixel grid are available, but Kollage is not specifically optimized for professional pixel-art workflows.
-- **Extension system:** The extension system is not currently functional. Support for extensions is planned to make it easier to add effects without modifying the original source code.
+- **Pixel art:** Pixel-perfect mode and the image pixel grid are available, but Kollage is not specifically optimized for every professional pixel-art workflow.
+- **Wavelet denoising:** Automatic thresholding is intended for ordinary image noise. For JPEG compression artifacts, use manual thresholding or the automatic decompression feature.
+- **Deblocking:** The adaptive deblocking filter assumes a regular block grid, typically 8×8 pixels. The block size can be adjusted between 4×4 and 32×32 pixels.
 - **Translations:** The interface supports English, French, Spanish, German, and Japanese. Some text, buttons, or dialogs may still fall back to English.
 - **KRA compatibility:** Kollage can read and write `.kra` files, but compatibility with Krita has not been fully verified. Reading has limitations: groups are flattened, and vector layers, clone layers, masks, and unsupported color spaces may not be preserved. Files saved by Kollage are written as 8-bit RGBA.
 - **SVG import:** SVG files are rasterized at the requested width onto a white background. They are not preserved as editable vector graphics.
 - **GIF import:** Importing all frames as layers requires a browser that supports `ImageDecoder`, such as a compatible version of Chrome.
-- **Feature completeness:** Some tools and workflows still need further testing and refinement.
-- **Saving on Android:** It is unfortunately currently unavailable to save files on Android.
+- **Extension system:** Extensions can be installed and managed through the extension manager. Invalid or failing extensions are rejected or disabled when possible, and safe mode (`#safe`) allows Kollage to start without extensions. Third-party extensions may still contain bugs or cause unexpected behavior.
 
-Version 1.3.1 has been tested on an Android tablet, a Windows 11 laptop, and a Fedora desktop. These tests do not guarantee compatibility with every device, browser, operating system, or file format.
+Version 1.4.1 has been tested in a browser environment. All 37 effects, 19 tools, and 37 actions passed the available tests without errors. Undo and redo operations on layers were also verified to restore identical pixel data, and the new effects produced consistent results across all five supported languages.
+
+It also has been tested on an Android tablet, a Windows 11 laptop, and a Fedora desktop. These tests do not guarantee compatibility with every device, browser, operating system, or file format.
 
 Please keep backups of important projects and exported files.
 
@@ -70,7 +89,9 @@ I am sharing it freely because someone else might have the same problem I had. I
 
 I would be genuinely happy to see **actual developers and other interested people take over, fork, improve, or adapt Kollage** to suit their own needs. You are welcome to explore the code, report issues, suggest improvements, and build upon the project.
 
-I do not expect the community to wait for me to implement every requested feature. If you need something that Kollage does not offer, feel free to experiment with the code or create your own version. I'll add the extension part so it's easier for you to add effects for Kollage without editing the source code (like paint.net)
+I do not expect the community to wait for me to implement every requested feature. If you need something that Kollage does not offer, feel free to experiment with the code or create your own version. 
+
+The extension system is now available, making it easier to add custom effects and functionality without modifying the original source code. You can create your own extensions, explore the examples, or build upon the existing system to adapt Kollage to your needs, much like plugin systems found in other image editors.
 
 ## Feedback and Contributions
 
@@ -97,5 +118,3 @@ Thanks for taking a look at Kollage.
   <img src="https://i.8upload.com/image/6cdef82dda272377/capture-d-cran-20261022-135328.png" width="500"/>
 
 </p>
-
-# Big update soon!
