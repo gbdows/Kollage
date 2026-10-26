@@ -1194,13 +1194,43 @@
         height: 20px
       }
     }
+  
+    #pksw {
+      position: fixed;
+      width: 22px;
+      height: 22px;
+      border: 2px solid #fff;
+      outline: 1px solid #000;
+      box-shadow: 0 1px 4px #0008;
+      pointer-events: none;
+      z-index: 200;
+      display: none
+    }
+
+    .it.ext>span:first-child::after {
+      content: '';
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-left: 7px;
+      border-radius: 50%;
+      background: #2fb344;
+      box-shadow: 0 0 0 1px #ffffff90;
+      vertical-align: middle
+    }
+
+    #wdlgb select,
+    #wdlgb input[type=text],
+    #wdlgb input:not([type]) {
+      font: inherit
+    }
   </style>
 </head>
 
 <body>
   <div id="top">
     <div id="lt">
-      <div id="mb"><span class="app" title="Kollage v1.3.1">◆ Kollage</span></div>
+      <div id="mb"><span class="app" title="Kollage v1.4.0">◆ Kollage</span></div>
       <div id="ic"></div>
     </div>
     <div id="tabs"></div>
@@ -1208,18 +1238,21 @@
   </div>
   <div id="tb">
     <span>Outil : <b id="tn"></b></span>
-    <span class="o" data-t="brush erase line shape">Largeur <input id="bw" type="number" min="1" max="300"
+    <span class="o" data-t="brush erase line shape polyline finger">Largeur <input id="bw" type="number" min="1" max="300"
         value="6"></span>
+    <span class="o" data-t="brush">Brosse <select id="bt"><option value="b">Basique</option><option value="p">Basique (taille selon la pression)</option><option value="a">Aérographe doux</option><option value="c">Crayon</option></select></span>
+    <span class="o" data-t="finger">Force <input id="fst" type="range" min="5" max="100" value="60"> <b id="fsv">60%</b></span>
+    <span class="o" data-t="brush erase finger"><label><input type="checkbox" id="spd"> Taille selon la vitesse (tactile)</label></span>
     <span class="o" data-t="brush erase">Dureté <input id="hd" type="range" min="0" max="100" value="75"> <b
         id="hv">75%</b></span>
     <span class="o" data-t="brush erase"><label><input type="checkbox" id="stb"> Stabilisateur</label> <input id="stn"
         type="range" min="1" max="100" value="20" style="width:70px"></span>
-    <span class="o" data-t="brush erase"><label><input type="checkbox" id="prs" checked> Pression du
+    <span class="o" data-t="erase"><label><input type="checkbox" id="prs" checked> Pression du
         stylet</label></span>
     <span class="o" data-t="pick"><label><input type="checkbox" id="pimg"> Couleurs de l’image (sinon
         calque)</label></span>
     <span class="o" data-t="movepx"><label><input type="checkbox" id="snp"> Magnétisme (bords, axes, centre)</label></span>
-    <span class="o" data-t="rs es lasso wand"><label><input type="checkbox" id="sadd"> Ajouter à la sélection</label></span>
+    <span class="o" data-t="rs es lasso wand">Mode <select id="smode"><option value="n">Normal</option><option value="a">Ajouter à la sélection</option><option value="s">Retirer de la sélection</option><option value="i">Sélection inversée</option></select></span>
     <span class="o" data-t="zoom"><label><input type="checkbox" id="zoutc"> Zoom arrière</label></span>
     <span class="o" data-t="shape">Forme <select id="shp">
         <option value="r">Rectangle</option>
@@ -1227,7 +1260,7 @@
         <option value="o">Ellipse</option>
         <option value="t">Triangle</option>
       </select></span>
-    <span class="o" data-t="shape">Remplissage <select id="fill">
+    <span class="o" data-t="shape polyline">Remplissage <select id="fill">
         <option value="o">Contour</option>
         <option value="f">Couleur pleine</option>
         <option value="b">Contour + remplissage</option>
@@ -1338,9 +1371,10 @@
   <input type="file" id="xf" accept=".js" multiple hidden><input type="file" id="file"
     accept="image/*,.kol,.pdn,.kra,.svg" multiple hidden>
   <script>
-    const $ = s => document.getElementById(s), E = (t, o = {}, ...c) => { const e = Object.assign(document.createElement(t), o); e.append(...c); return e };
+    const $ = s => document.getElementById(s), E = (t, o = {}, ...c) => { const e = document.createElement(t); for (const k in o) k.includes('-') ? e.setAttribute(k, o[k]) : e[k] = o[k]; e.append(...c); return e };
     const cv = $('cv'), cx = cv.getContext('2d', { willReadFrequently: true }), ov = $('ov'), oc = ov.getContext('2d');
     let docs = [], D = null, tool = 'brush', c1 = '#000000', c2 = '#ffffff', al1 = 1, al2 = 1, drag = null, last = null, clip = null, grid = 0, PP = 0, tp = null, pan = null, space = false, LANG = (() => { try { return localStorage.getItem('pn-lang') } catch (e) { } })() || 'en';
+    var clipFresh = 0, clipUsed = 0; const BRT = ['brush', 'erase', 'pencil', 'finger'];
     const cvs = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c };
     const L = () => D.layers[D.cur], X = () => L().x, rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)), rgba = (h, a) => { const [r, g, b] = rgb(h); return `rgba(${r},${g},${b},${a})` };
     const mkL = (w, h, n) => { const c = cvs(w, h); return { c, x: c.getContext('2d', { willReadFrequently: true }), name: n, vis: true, op: 1, bm: 0 } };
@@ -1366,6 +1400,8 @@
         pencil: `<g transform="rotate(45 12 12)"><rect x="10.3" y="1.5" width="3.4" height="2.6" rx=".8" fill="${PK}" stroke="${N}" stroke-width="1"/><rect x="10.3" y="4" width="3.4" height="1.6" fill="#c3ccd9" stroke="${N}" stroke-width=".8"/><rect x="10.3" y="5.6" width="3.4" height="10" fill="${Y}" stroke="${N}" stroke-width="1"/><path d="M10.3 15.6h3.4L12 21.8z" fill="#f2d3a6" stroke="${N}" stroke-width="1" stroke-linejoin="round"/><path d="M11.2 19.3h1.6L12 21.8z" fill="${N}"/></g>`,
         pick: `<path d="M13.2 6.2l4.6 4.6-8.6 8.6-3.9 1 1-3.9z" fill="${LB}" stroke="${N}" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.4 14.4l2.2 2.2-2.8 2.8-1.2.3.3-1.2z" fill="${B}"/><path d="M14.4 5l4.6 4.6" stroke="${B1}" stroke-width="4" stroke-linecap="round"/><path d="M16 2.8l5.2 5.2" stroke="${N}" stroke-width="2.4" stroke-linecap="round"/>`,
         text: `<path d="M4.5 4.5h15v4h-1.9V6.7h-4.7v10.6h2v2.2H9.1v-2.2h2V6.7H6.4v1.8H4.5z" fill="${N}" stroke="${N}" stroke-width=".6" stroke-linejoin="round"/>`,
+        polyline: `<path d="M3.5 18.5L9 7.5l5.5 8 6-10" fill="none" stroke="${B}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="16.5" width="4" height="4" fill="#fff" stroke="${N}" stroke-width="1.1"/><rect x="7" y="5.5" width="4" height="4" fill="#fff" stroke="${N}" stroke-width="1.1"/><rect x="12.5" y="13.5" width="4" height="4" fill="#fff" stroke="${N}" stroke-width="1.1"/><rect x="18.5" y="2.5" width="4" height="4" fill="#fff" stroke="${N}" stroke-width="1.1"/>`,
+        finger: `<path d="M9 21c-2-1-3.5-3-4-6l-1-3.5c-.3-1 1-1.6 1.7-.8L8 13V5.5a1.5 1.5 0 013 0V11h.5V8a1.5 1.5 0 013 0v3h.5V9.5a1.5 1.5 0 013 0V15c0 3.5-2 6-5 6z" fill="#fde0c8" stroke="${N}" stroke-width="1.2" stroke-linejoin="round"/>`,
         line: `<path d="M5.5 18.5L18.5 5.5" stroke="${B}" stroke-width="2.4" stroke-linecap="round"/><rect x="2.8" y="16" width="4.6" height="4.6" fill="#fff" stroke="${N}" stroke-width="1.2"/><rect x="16.6" y="3.4" width="4.6" height="4.6" fill="#fff" stroke="${N}" stroke-width="1.2"/>`,
         shape: `<rect x="2.8" y="3" width="11" height="11" fill="${B}" stroke="${B1}" stroke-width="1.2"/><circle cx="15.5" cy="15.5" r="6" fill="#b07ae0" stroke="${PU}" stroke-width="1.2" opacity=".95"/><path d="M5 21.5l3.6-6.5 3.6 6.5z" fill="${GY}" stroke="${N}" stroke-width="1.1" stroke-linejoin="round"/>`,
         add: `<rect x="3.5" y="6.5" width="13" height="14" fill="#fff" stroke="${N}" stroke-width="1.3"/><circle cx="17" cy="7" r="5" fill="${GN}" stroke="#2f7d33" stroke-width="1"/><path d="M17 4.2v5.6M14.2 7h5.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`,
@@ -1554,10 +1590,20 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     function relang() { document.documentElement.lang = LANG; trDOM(); setTool(tool); hp(); lp(); tabs(); ui() }
     function startPan(e) { const s = $('scroll'); pan = { sx: e.clientX, sy: e.clientY, sl: s.scrollLeft, st: s.scrollTop }; cv.style.cursor = 'grabbing' }
     // ---------- Documents and history
-    function mkDoc(w, h, name, img) { const d = { name, w, h, layers: [mkL(w, h, 'Arrière-plan')], cur: 0, hist: [], hi: -1, zoom: 1, sel: null }, x = d.layers[0].x; x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); if (img) x.drawImage(img, 0, 0); const s = $('scroll'); d.zoom = Math.max(.05, Math.min(1, (s.clientWidth - 30) / w, (s.clientHeight - 30) / h)); docs.push(d); D = d; push(img ? 'Ouvrir l’image' : 'Nouvelle image'); d.sv = d.hist[0] }
-    const snap = d => ({ w: d.w, h: d.h, cur: d.cur, L: d.layers.map(l => ({ n: l.name, v: l.vis, o: l.op, b: l.bm | 0, i: l.x.getImageData(0, 0, d.w, d.h) })) });
-    function restore(s) { if (D.w !== s.w || D.h !== s.h) D.sel = null; D.w = s.w; D.h = s.h; D.cur = Math.min(s.cur, s.L.length - 1); D.layers = s.L.map(q => { const l = mkL(s.w, s.h, q.n); l.vis = q.v; l.op = q.o; l.bm = q.b | 0; l.x.putImageData(q.i, 0, 0); return l }) }
-    function push(n) { D.hist = D.hist.slice(0, D.hi + 1); D.hist.push({ n, s: snap(D) }); if (D.hist.length > 100) D.hist.shift(); D.hi = D.hist.length - 1; ui() }
+    function mkDoc(w, h, name, img) { const d = { name, w, h, layers: [mkL(w, h, 'Arrière-plan')], cur: 0, hist: [], hi: -1, zoom: 1, sel: null }, x = d.layers[0].x; if (img) x.drawImage(img, 0, 0); else { x.fillStyle = '#fff'; x.fillRect(0, 0, w, h) } const s = $('scroll'); d.zoom = Math.max(.05, Math.min(1, (s.clientWidth - 30) / w, (s.clientHeight - 30) / h)); docs.push(d); D = d; push(img ? 'Ouvrir l’image' : 'Nouvelle image'); d.sv = d.hist[0] }
+    const sameImg = (a, b) => {
+      if (!a || !b || a.width !== b.width || a.height !== b.height) return false;
+      const x = new Int32Array(a.data.buffer, a.data.byteOffset, a.data.length >> 2), y = new Int32Array(b.data.buffer, b.data.byteOffset, b.data.length >> 2);
+      for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+      return true
+    };
+    // A layer that did not change since its last snapshot (l._im) re-uses it instead of storing another copy.
+    const snap = d => ({ w: d.w, h: d.h, cur: d.cur, L: d.layers.map(l => { let im = l.x.getImageData(0, 0, d.w, d.h); if (sameImg(im, l._im)) im = l._im; else l._im = im; return { n: l.name, v: l.vis, o: l.op, b: l.bm | 0, i: im } }) });
+    // Memory budget for the history (bytes of distinct snapshots): smaller on low-memory machines.
+    const HIST_BUDGET = Math.max(128e6, Math.min(768e6, (navigator.deviceMemory || 4) * 96e6));
+    const histBytes = d => { const seen = new Set(); let n = 0; for (const h of d.hist) for (const q of h.s.L) if (!seen.has(q.i)) { seen.add(q.i); n += q.i.data.length } return n };
+    function restore(s) { if (D.w !== s.w || D.h !== s.h) D.sel = null; D.w = s.w; D.h = s.h; D.cur = Math.min(s.cur, s.L.length - 1); D.layers = s.L.map(q => { const l = mkL(s.w, s.h, q.n); l.vis = q.v; l.op = q.o; l.bm = q.b | 0; l.x.putImageData(q.i, 0, 0); l._im = q.i; return l }) }
+    function push(n) { D.hist = D.hist.slice(0, D.hi + 1); D.hist.push({ n, s: snap(D) }); if (D.hist.length > 100) D.hist.shift(); while (D.hist.length > 3 && histBytes(D) > HIST_BUDGET) D.hist.shift(); D.hi = D.hist.length - 1; ui() }
     const dirty = d => d.hist[d.hi] !== d.sv;
     function go(i) { if (!D || i < 0 || i >= D.hist.length) return; commitText(); D.hi = i; restore(D.hist[i].s); ui() }
     function use(d) { commitText(); D = d; ui() }
@@ -1589,7 +1635,9 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     // ---------- Automatic recovery: closing the page never loses work
     const idb = (m, k, v) => new Promise((ok, ko) => { const r = indexedDB.open('kollage', 1); r.onupgradeneeded = () => r.result.createObjectStore('r'); r.onerror = () => ko(r.error); r.onsuccess = () => { const t = r.result.transaction('r', m === 'get' ? 'readonly' : 'readwrite'), o = t.objectStore('r'), q = m === 'get' ? o.get(k) : m === 'set' ? o.put(v, k) : o.delete(k); t.oncomplete = () => ok(q.result); t.onerror = () => ko(t.error) } });
     let asT = 0, recPending = 1;
-    const autosaveSoon = () => { clearTimeout(asT); asT = setTimeout(async () => { if (recPending) return; try { const out = []; for (const d of docs) if (dirty(d)) out.push({ name: d.name, kol: await KOL.write(d) }); await (out.length ? idb('set', 'docs', out) : idb('del', 'docs')) } catch (e) { } }, 1500) };
+    const autosaveRun = async () => { if (recPending) return; try { const out = []; for (const d of docs) if (dirty(d)) out.push({ name: d.name, kol: await KOL.write(d) }); await (out.length ? idb('set', 'docs', out) : idb('del', 'docs')) } catch (e) { } };
+    const autosaveSoon = () => { clearTimeout(asT); asT = setTimeout(() => { if (drag) autosaveSoon(); else autosaveRun() }, 3000) };
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { clearTimeout(asT); autosaveRun() } });
     function ui() { render(); hp(); lp(); tabs(); $('sz').textContent = D.w + ' × ' + D.h; $('zl').textContent = Math.round(D.zoom * 100) + '%'; $('zs').value = D.zoom * 100; document.title = (dirty(D) ? '• ' : '') + tr(D.name) + ' – Kollage'; autosaveSoon() }
     function sz(z, e) { const s = $('scroll'), r = cv.getBoundingClientRect(), sr = s.getBoundingClientRect(), X0 = e ? e.clientX : sr.left + s.clientWidth / 2, Y0 = e ? e.clientY : sr.top + s.clientHeight / 2, ix = (X0 - r.left) / D.zoom, iy = (Y0 - r.top) / D.zoom; D.zoom = Math.max(.05, Math.min(100, z)); renderNow(); const q = cv.getBoundingClientRect(); s.scrollLeft += q.left + ix * D.zoom - X0; s.scrollTop += q.top + iy * D.zoom - Y0; $('zl').textContent = Math.round(D.zoom * 100) + '%'; $('zs').value = D.zoom * 100 }
     let rq = 0; const render = () => { rq || (rq = requestAnimationFrame(() => { rq = 0; renderNow() })) };
@@ -1643,7 +1691,7 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
       $('sh').style.background = 'linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)'; $('ss').style.background = g(h2rgb(HSV[0], 0, HSV[2]), h2rgb(HSV[0], 1, HSV[2])); $('sv').style.background = g([0, 0, 0], h2rgb(HSV[0], HSV[1], 1));
       $('al').style.background = `linear-gradient(to right,rgba(${q},0),rgba(${q},1)),repeating-conic-gradient(#bbb 0 25%,#fff 0 50%) 0 0/8px 8px`; drawWheel()
     }
-    function setCol(n, c, a) { if (n === 1) { c1 = c; if (a !== undefined) al1 = a } else { c2 = c; if (a !== undefined) al2 = a } swt(n); sync() }
+    function setCol(n, c, a) { c = palSnap(c); if (n === 1) { c1 = c; if (a !== undefined) al1 = a } else { c2 = c; if (a !== undefined) al2 = a } swt(n); sync() }
     function setAl(v) { const n = +$('wh').value, a = Math.max(0, Math.min(255, +v || 0)) / 255; if (n === 1) al1 = a; else al2 = a; swt(n) }
     const which = e => e.button === 2 ? 2 : +$('wh').value;
     const wset = () => { wlock = 1; setCol(+$('wh').value, hx(h2rgb(...HSV))); wlock = 0 };
@@ -1657,22 +1705,23 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     $('mb2').onclick = () => $('cols').classList.toggle('less');
     $('hex').onchange = e => { if (/^#[0-9a-f]{6}$/i.test(e.target.value)) setCol(+$('wh').value, e.target.value.toLowerCase()) }; $('wh').onchange = sync; $('al').oninput = e => { $('an').value = e.target.value; setAl(e.target.value) }; $('an').oninput = e => { $('al').value = e.target.value; setAl(e.target.value) };
     // ---------- Tools
-    const T = { rs: ['⬚', 'Rectangle de sélection', 'Glisser pour sélectionner. Suppr efface, Ctrl+C/X/V copie, coupe, colle.'], movepx: ['✥', 'Déplacer les pixels sélectionnés', 'Glisser pour déplacer les pixels de la sélection (ou tout le calque).'], lasso: ['➰', 'Lasso', 'Glisser pour tracer une sélection libre.'], movesel: ['⇲', 'Déplacer la sélection', 'Glisser pour déplacer le contour de la sélection sans toucher aux pixels.'], es: ['◌', 'Ellipse de sélection', 'Glisser pour sélectionner une ellipse.'], zoom: ['🔍', 'Zoom', 'Clic gauche : zoom avant, clic droit : zoom arrière.'], wand: ['🪄', 'Baguette magique', 'Clic pour sélectionner une zone de couleur proche (tolérance réglable).'], pan: ['✋', 'Main', 'Glisser pour déplacer la vue.'], fill: ['🪣', 'Pot de peinture', 'Clic gauche : couleur principale, clic droit : secondaire.'], grad: ['◧', 'Dégradé', 'Glisser pour tracer un dégradé principale → secondaire.'], brush: ['🖌️', 'Pinceau', 'Clic gauche : couleur principale, clic droit : couleur secondaire.'], erase: ['🩹', 'Gomme', 'Glisser pour effacer (transparence).'], pencil: ['✏️', 'Crayon', 'Tracé d’un pixel, sans lissage.'], pick: ['💉', 'Pipette', 'Clic pour prélever une couleur.'], text: ['T', 'Texte', 'Glisser pour tracer la zone de texte, taper, Entrée valide, Maj+Entrée saute une ligne, Échap annule.'], line: ['╱', 'Ligne', 'Glisser pour tracer une ligne.'], shape: ['◇', 'Formes', 'Glisser pour dessiner la forme choisie.'] };
+    const T = { rs: ['⬚', 'Rectangle de sélection', 'Glisser pour sélectionner. Suppr efface, Ctrl+C/X/V copie, coupe, colle.'], movepx: ['✥', 'Déplacer les pixels sélectionnés', 'Glisser pour déplacer les pixels de la sélection (ou tout le calque).'], lasso: ['➰', 'Lasso', 'Glisser pour tracer une sélection libre.'], movesel: ['⇲', 'Déplacer la sélection', 'Glisser pour déplacer le contour de la sélection sans toucher aux pixels.'], es: ['◌', 'Ellipse de sélection', 'Glisser pour sélectionner une ellipse.'], zoom: ['🔍', 'Zoom', 'Clic gauche : zoom avant, clic droit : zoom arrière.'], wand: ['🪄', 'Baguette magique', 'Clic pour sélectionner une zone de couleur proche (tolérance réglable).'], pan: ['✋', 'Main', 'Glisser pour déplacer la vue.'], fill: ['🪣', 'Pot de peinture', 'Clic gauche : couleur principale, clic droit : secondaire.'], grad: ['◧', 'Dégradé', 'Glisser pour tracer un dégradé principale → secondaire.'], brush: ['🖌️', 'Pinceau', 'Clic gauche : couleur principale, clic droit : couleur secondaire.'], erase: ['🩹', 'Gomme', 'Glisser pour effacer (transparence).'], pencil: ['✏️', 'Crayon', 'Tracé d’un pixel, sans lissage.'], pick: ['💉', 'Pipette', 'Clic pour prélever une couleur.'], text: ['T', 'Texte', 'Glisser pour tracer la zone de texte, taper, Entrée valide, Maj+Entrée saute une ligne, Échap annule.'], line: ['╱', 'Ligne', 'Glisser pour tracer une ligne.'], polyline: ['⟋', 'Polyligne', 'Clic pour ajouter des points ; double-clic, clic droit ou Entrée pour terminer ; Retour arrière retire le dernier point ; Échap annule.'], finger: ['👆', 'Doigt', 'Glisser pour étaler et mélanger les couleurs (comme dans Ibis Paint X).'], shape: ['◇', 'Formes', 'Glisser pour dessiner la forme choisie.'] };
     for (const k in T) $('tg').append(E('button', { className: 'tbn', title: T[k][1], innerHTML: svg(k), id: 't_' + k, onclick: () => setTool(k) }));
     const curs = () => ({ pan: 'grab', zoom: 'zoom-in', movepx: 'move', movesel: 'move' }[tool] || 'crosshair');
-    function setTool(k) { commitText(); setTimeout(() => bcUpd(), 0); tool = k; $('tn').textContent = tr(T[k][1]); document.querySelectorAll('.tbn').forEach(b => b.classList.toggle('on', b.id === 't_' + k)); document.querySelectorAll('.o').forEach(o => o.style.display = o.dataset.t.split(' ').includes(k) ? '' : 'none'); cv.style.cursor = curs(); say(tr(T[k][2])) }
+    function setTool(k) { commitText(); setTimeout(() => { bcUpd(); pkUpd() }, 0); if (pl && k !== 'polyline') plEnd(true); tool = k; $('tn').textContent = tr(T[k][1]); document.querySelectorAll('.tbn').forEach(b => b.classList.toggle('on', b.id === 't_' + k)); document.querySelectorAll('.o').forEach(o => o.style.display = o.dataset.t.split(' ').includes(k) ? '' : 'none'); cv.style.cursor = curs(); say(tr(T[k][2])) }
     $('hd').oninput = e => $('hv').textContent = e.target.value + '%'; $('tol').oninput = e => $('tv').textContent = e.target.value + '%';
     const P = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / D.zoom, y: (e.clientY - r.top) / D.zoom } };
     function paint(fn) { const x = X(); x.save(); if (D.sel) x.clip(D.sel.p); fn(x); x.restore(); render() }
     function commitCanvas(c) { const x = X(); x.save(); if (D.sel) x.clip(D.sel.p); x.clearRect(0, 0, D.w, D.h); x.drawImage(c, 0, 0); x.restore(); render() }
     function commitData(im) { const t = cvs(im.width, im.height); t.getContext('2d').putImageData(im, 0, 0); commitCanvas(t) }
-    let pr = 1, pen = 0; addEventListener('pointerdown', e => { pen = e.pointerType === 'pen'; pr = pen ? e.pressure || .5 : 1 }, true); addEventListener('pointermove', e => { if (e.buttons) { pen = e.pointerType === 'pen'; pr = pen ? e.pressure || .5 : 1 } }, true);
-    const BW = () => { const w = +$('bw').value; return pen && $('prs').checked ? Math.max(1, w * pr) : w };
+    let pr = 1, pen = 0, ptyp = '', spf = 1, sx0 = 0, sy0 = 0, st0 = 0, spv = 0; addEventListener('pointerdown', e => { pen = e.pointerType === 'pen'; ptyp = e.pointerType; pr = pen ? e.pressure || .5 : 1; spf = 1; spv = 0; sx0 = e.clientX; sy0 = e.clientY; st0 = e.timeStamp }, true); addEventListener('pointermove', e => { if (e.buttons) { pen = e.pointerType === 'pen'; ptyp = e.pointerType; pr = pen ? e.pressure || .5 : 1; const dt = e.timeStamp - st0; if (dt > 0 && ptyp === 'touch') { const v = Math.hypot(e.clientX - sx0, e.clientY - sy0) / dt; spv = spv * .6 + v * .4; const t = Math.max(0, Math.min(1, (spv - .15) / 2)); spf += (1.15 - t * .9 - spf) * .35 } sx0 = e.clientX; sy0 = e.clientY; st0 = e.timeStamp } }, true);
+    const BW = () => { const w = +$('bw').value; if (pen && (tool === 'brush' ? $('bt').value === 'p' : $('prs').checked)) return Math.max(1, w * pr); if (!pen && ptyp === 'touch' && $('spd').checked && BRT.includes(tool)) return Math.max(1, w * spf); return w };
     const stab = p => { if (tool === 'pencil' || !$('stb').checked) return p; const R = +$('stn').value / D.zoom, c = drag.sc || (drag.sc = last), dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy); if (d > R) { const k = (d - R) / d; drag.sc = { x: c.x + dx * k, y: c.y + dy * k } } return drag.sc };
     function dab(a, b) {
-      const r = Math.max(.3, BW() / 2), h = Math.min(.98, $('hd').value / 100), er = tool === 'erase'; paint(x => {
+      if (tool === 'finger') { fingerDab(a, b); return }
+      const r = Math.max(.3, BW() / 2), h = Math.min(.98, $('hd').value / 100), er = tool === 'erase', bt = tool === 'brush' ? $('bt').value : 'b', hh = bt === 'a' ? 0 : h; paint(x => {
         const dist = Math.hypot(b.x - a.x, b.y - a.y); if (PP && tool !== 'pencil') { ppDab(x, a, b, er); return } if (tool === 'pencil') { const n = Math.max(1, Math.ceil(dist)); x.fillStyle = rgba(drag.col, drag.a); for (let i = 0; i <= n; i++)x.fillRect(Math.floor(a.x + (b.x - a.x) * i / n), Math.floor(a.y + (b.y - a.y) * i / n), 1, 1); return }
-        x.globalCompositeOperation = er ? 'destination-out' : $('bm').value; const n = Math.max(1, Math.ceil(dist / Math.max(1, r * .25))); for (let i = 0; i <= n; i++) { const px = a.x + (b.x - a.x) * i / n, py = a.y + (b.y - a.y) * i / n, g = x.createRadialGradient(px, py, r * h, px, py, r), c = er ? '#000000' : drag.col, aa = drag.a; g.addColorStop(0, rgba(c, aa)); g.addColorStop(1, rgba(c, 0)); x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill() }
+        x.globalCompositeOperation = er ? 'destination-out' : $('bm').value; const n = Math.max(1, Math.ceil(dist / Math.max(1, r * .25))); for (let i = 0; i <= n; i++) { const px = a.x + (b.x - a.x) * i / n, py = a.y + (b.y - a.y) * i / n, g = x.createRadialGradient(px, py, r * hh, px, py, r), c = er ? '#000000' : drag.col, aa = bt === 'a' ? drag.a * .1 : drag.a; if (bt === 'c') { pencilGrain(x, px, py, r, c, aa); continue } g.addColorStop(0, rgba(c, aa)); g.addColorStop(1, rgba(c, 0)); x.fillStyle = g; x.beginPath(); x.arc(px, py, r, 0, 7); x.fill() }
       })
     }
     function shapeDraw(a, b) {
@@ -1710,43 +1759,43 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
       const W = im.width, H = im.height, d = im.data, m = new Uint8Array(W * H); x |= 0; y |= 0; if (x < 0 || y < 0 || x >= W || y >= H) return m; const i0 = (y * W + x) * 4, T0 = tol / 100 * 1020, ok = i => Math.abs(d[i] - d[i0]) + Math.abs(d[i + 1] - d[i0 + 1]) + Math.abs(d[i + 2] - d[i0 + 2]) + Math.abs(d[i + 3] - d[i0 + 3]) <= T0, st = [[x, y]];
       while (st.length) { const [px, py] = st.pop(); if (m[py * W + px] || !ok((py * W + px) * 4)) continue; let l = px, r = px; while (l > 0 && !m[py * W + l - 1] && ok((py * W + l - 1) * 4)) l--; while (r < W - 1 && !m[py * W + r + 1] && ok((py * W + r + 1) * 4)) r++; for (let i = l; i <= r; i++)m[py * W + i] = 1; for (const ny of [py - 1, py + 1]) if (ny >= 0 && ny < H) { let s = 0; for (let i = l; i <= r; i++) { const k = ny * W + i; if (!m[k] && ok(k * 4)) { if (!s) { st.push([i, ny]); s = 1 } } else s = 0 } } } return m
     }
-    const mg = ns => { const b = drag && drag.b0; if (!b || !ns) return ns; const p = new Path2D(); p.addPath(b.p); p.addPath(ns.p); const x = Math.min(b.b.x, ns.b.x), y = Math.min(b.b.y, ns.b.y); return { p, k: 'lasso', b: { x, y, w: Math.max(b.b.x + b.b.w, ns.b.x + ns.b.w) - x, h: Math.max(b.b.y + b.b.h, ns.b.y + ns.b.h) - y } } };
+    const mg = ns => { const md = drag && drag.mode, b = drag && drag.b0; if (ns && md === 'i') return selBool(null, ns); if (ns && b && md === 's') return selBool(b, ns); if (!b || !ns) return ns; const p = new Path2D(); p.addPath(b.p); p.addPath(ns.p); const x = Math.min(b.b.x, ns.b.x), y = Math.min(b.b.y, ns.b.y); return { p, k: 'lasso', b: { x, y, w: Math.max(b.b.x + b.b.w, ns.b.x + ns.b.w) - x, h: Math.max(b.b.y + b.b.h, ns.b.y + ns.b.h) - y } } };
     const bbox = p => { const xs = p.map(q => q.x), ys = p.map(q => q.y), x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y } };
     cv.onpointerdown = e => {
-      if (!D || e.button === 1) return; e.preventDefault(); if (!(tool === 'movepx' && fl)) commitText(); if (space) { startPan(e); return } const p = P(e), rb = e.button === 2, s = $('scroll'); drag = { p, col: rb ? c2 : c1, col2: rb ? c1 : c2, a: rb ? al2 : al1, a2: rb ? al1 : al2, sx: e.clientX, sy: e.clientY, sl: s.scrollLeft, st: s.scrollTop, pts: [p] }; last = p;
+      if (!D || e.button === 1) return; e.preventDefault(); if (tool === 'polyline' && !space) { plDown(e); return } if (!(tool === 'movepx' && fl)) commitText(); if (space) { startPan(e); return } const p = P(e), rb = e.button === 2, s = $('scroll'); drag = { p, col: rb ? c2 : c1, col2: rb ? c1 : c2, a: rb ? al2 : al1, a2: rb ? al1 : al2, sx: e.clientX, sy: e.clientY, sl: s.scrollLeft, st: s.scrollTop, pts: [p] }; last = p;
       if (tool === 'movepx') { flDown(p, rb) } else if (tool === 'zoom') { sz(D.zoom * (rb || $('zoutc').checked ? .8 : 1.25), e); drag = null }
       else if (tool === 'pick') { if (p.x < 0 || p.y < 0 || p.x >= D.w || p.y >= D.h) { drag = null; return } const d = ($('pimg').checked ? cx : X()).getImageData(p.x | 0, p.y | 0, 1, 1).data; setCol(rb ? 2 : +$('wh').value, hx(d), d[3] / 255); drag = null }
       else if (tool === 'fill') { const im = X().getImageData(0, 0, D.w, D.h), m = flood(im, p.x, p.y, +$('tol').value), [r, g, b] = rgb(drag.col); for (let i = 0; i < m.length; i++)if (m[i]) im.data.set([r, g, b, Math.round(drag.a * 255)], i * 4); commitData(im); push('Pot de peinture'); drag = null }
-      else if (tool === 'wand') { drag.b0 = (e.ctrlKey || $('sadd').checked) && D.sel ? D.sel : null; const im = X().getImageData(0, 0, D.w, D.h), m = flood(im, p.x, p.y, +$('tol').value), pa = new Path2D(); let x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0; for (let y = 0; y < D.h; y++)for (let x = 0; x < D.w; x++)if (m[y * D.w + x]) { let e2 = x; while (e2 < D.w && m[y * D.w + e2]) e2++; pa.rect(x, y, e2 - x, 1); x0 = Math.min(x0, x); x1 = Math.max(x1, e2); y0 = Math.min(y0, y); y1 = y; x = e2 } { const ns = x1 ? { p: pa, k: 'wand', b: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 + 1 } } : null; D.sel = ns ? mg(ns) : drag.b0 } overlay(); drag = null }
+      else if (tool === 'wand') { drag.mode = e.ctrlKey ? 'a' : $('smode').value; drag.b0 = (drag.mode === 'a' || drag.mode === 's') && D.sel ? D.sel : null; const im = X().getImageData(0, 0, D.w, D.h), m = flood(im, p.x, p.y, +$('tol').value), pa = new Path2D(); let x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0; for (let y = 0; y < D.h; y++)for (let x = 0; x < D.w; x++)if (m[y * D.w + x]) { let e2 = x; while (e2 < D.w && m[y * D.w + e2]) e2++; pa.rect(x, y, e2 - x, 1); x0 = Math.min(x0, x); x1 = Math.max(x1, e2); y0 = Math.min(y0, y); y1 = y; x = e2 } { const ns = x1 ? { p: pa, k: 'wand', b: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 + 1 } } : null; D.sel = ns ? mg(ns) : drag.b0 } overlay(); drag = null }
       else if (tool === 'text') { drag.tb = 1; drag.tc = rgba(drag.col, drag.a); drag.q = p }
-      else if (['brush', 'erase', 'pencil'].includes(tool)) dab(p, p);
+      else if (BRT.includes(tool)) dab(p, p);
       else if (['line', 'shape', 'grad'].includes(tool)) drag.base = X().getImageData(0, 0, D.w, D.h);
-      else if (['rs', 'es', 'lasso'].includes(tool)) { drag.b0 = (e.ctrlKey || $('sadd').checked) && D.sel ? D.sel : null; if (!drag.b0) { D.sel = null; overlay() } }
+      else if (['rs', 'es', 'lasso'].includes(tool)) { drag.mode = e.ctrlKey ? 'a' : $('smode').value; drag.b0 = (drag.mode === 'a' || drag.mode === 's') && D.sel ? D.sel : null; if (!drag.b0) { D.sel = null; overlay() } }
       else if (tool === 'pan') cv.style.cursor = 'grabbing'; else if (tool === 'movepx') { const f = cvs(D.w, D.h), fx = f.getContext('2d'), b2 = cvs(D.w, D.h), bx = b2.getContext('2d'); if (D.sel) { fx.save(); fx.clip(D.sel.p); fx.drawImage(L().c, 0, 0); fx.restore(); bx.drawImage(L().c, 0, 0); bx.save(); bx.clip(D.sel.p); bx.clearRect(0, 0, D.w, D.h); bx.restore() } else fx.drawImage(L().c, 0, 0); drag.f = f; drag.b2 = D.sel ? b2 : null; drag.sp = D.sel && D.sel.p; drag.sb = D.sel && { ...D.sel.b } } else if (tool === 'movesel') { if (D.sel) { drag.sp = D.sel.p; drag.sb = { ...D.sel.b } } }
     };
-    $('scroll').addEventListener('pointerdown', e => { if (e.button === 0 && D && D.sel && !fl && !space && ['rs', 'es', 'lasso', 'wand'].includes(tool) && e.target !== cv && e.pointerType !== 'touch') { const s = $('scroll'), r = s.getBoundingClientRect(); if (e.clientX < r.left + s.clientWidth && e.clientY < r.top + s.clientHeight) { D.sel = null; overlay() } } if (e.button === 1 || e.pointerType === 'touch' && e.target !== cv && e.target !== tx) { e.preventDefault(); startPan(e) } });
+    $('scroll').addEventListener('pointerdown', e => { if (e.button === 0 && D && fl && tool === 'movepx' && e.target !== cv && e.target !== tx && flHit(P(e))) { cv.onpointerdown(e); return } if (e.button === 0 && D && D.sel && !fl && !space && ['rs', 'es', 'lasso', 'wand'].includes(tool) && e.target !== cv && e.pointerType !== 'touch') { const s = $('scroll'), r = s.getBoundingClientRect(); if (e.clientX < r.left + s.clientWidth && e.clientY < r.top + s.clientHeight) { D.sel = null; overlay() } } if (e.button === 1 || e.pointerType === 'touch' && e.target !== cv && e.target !== tx) { e.preventDefault(); startPan(e) } });
     addEventListener('pointermove', e => {
-      if (!D) return; const p = P(e); $('pos').textContent = (p.x | 0) + ', ' + (p.y | 0); if (pan) { const s = $('scroll'); s.scrollLeft = pan.sl - (e.clientX - pan.sx); s.scrollTop = pan.st - (e.clientY - pan.sy); return } if (!drag) { if (tool === 'movepx' && fl) hoverCur(p); return }
+      if (!D) return; const p = P(e); $('pos').textContent = (p.x | 0) + ', ' + (p.y | 0); if (pan) { const s = $('scroll'); s.scrollLeft = pan.sl - (e.clientX - pan.sx); s.scrollTop = pan.st - (e.clientY - pan.sy); return } if (!drag) { if (pl && tool === 'polyline') plDraw(p); if (tool === 'movepx' && fl) hoverCur(p); else if ($('scroll').style.cursor) $('scroll').style.cursor = ''; return }
       if (tool === 'pan') { const s = $('scroll'); s.scrollLeft = drag.sl - (e.clientX - drag.sx); s.scrollTop = drag.st - (e.clientY - drag.sy) }
-      else if (['brush', 'erase', 'pencil'].includes(tool)) { const q = stab(p); if (q !== last) { dab(last, q); last = q } }
+      else if (BRT.includes(tool)) { const q = stab(p); if (q !== last) { dab(last, q); last = q } }
       else if (tool === 'rs' || tool === 'es') { const a = drag.p, P0 = PP ? { x: Math.round(a.x), y: Math.round(a.y) } : a, P1 = PP ? { x: Math.round(p.x), y: Math.round(p.y) } : p, x = Math.min(P0.x, P1.x), y = Math.min(P0.y, P1.y), w = Math.abs(P1.x - P0.x), h = Math.abs(P1.y - P0.y), pa = new Path2D(); tool === 'rs' ? pa.rect(x, y, w, h) : pa.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 7); D.sel = mg({ p: pa, k: tool, b: { x, y, w, h } }); overlay() }
       else if (tool === 'text') { drag.q = p; overlay() }
       else if (tool === 'lasso') { drag.pts.push(p); const pa = new Path2D(), pt = drag.pts; let ar = 0; for (let i = 0; i < pt.length; i++) { const q = pt[(i + 1) % pt.length]; ar += pt[i].x * q.y - q.x * pt[i].y } (ar < 0 ? [...pt].reverse() : pt).forEach((q, i) => i ? pa.lineTo(q.x, q.y) : pa.moveTo(q.x, q.y)); pa.closePath(); D.sel = mg({ p: pa, k: 'lasso', b: bbox(pt) }); overlay() }
       else if (tool === 'movepx') { flMove(p, e) } else if (tool === 'movesel') { const dx = Math.round(p.x - drag.p.x), dy = Math.round(p.y - drag.p.y); if (D.sel && drag.sp) { const np = new Path2D(); np.addPath(drag.sp, new DOMMatrix().translate(dx, dy)); D.sel = { ...D.sel, p: np, b: { ...drag.sb, x: drag.sb.x + dx, y: drag.sb.y + dy } } } if (tool === 'movepx') { const x = X(); x.clearRect(0, 0, D.w, D.h); if (drag.b2) x.drawImage(drag.b2, 0, 0); x.drawImage(drag.f, dx, dy); render() } else overlay() }
       else if (drag.base) { X().putImageData(drag.base, 0, 0); shapeDraw(drag.p, p) }
     });
-    addEventListener('pointerup', up1); addEventListener('pointercancel', up1); function up1() { if (pan) { pan = null; cv.style.cursor = curs(); return } if (fl && fl.sn) { fl.sn = null; overlay() } if (!drag) return; if (tool === 'text' && drag.tb) { const a = drag.p, q = drag.q || a, c = drag.tc; drag = null; let x = Math.round(Math.min(a.x, q.x)), y = Math.round(Math.min(a.y, q.y)), w = Math.round(Math.abs(q.x - a.x)), h = Math.round(Math.abs(q.y - a.y)); if (w < 6 && h < 6) { w = 240; h = Math.max(60, Math.round(+$('fs').value * 2.4)) } w = Math.max(w, 8); h = Math.max(h, 8); startText({ x, y, w, h }, c); overlay(); return } if (PP && (tool === 'es' || tool === 'lasso') && D.sel && D.sel.b.w >= 1 && D.sel.b.h >= 1) { const q = maskPath(D.sel.p); D.sel = q ? { p: q.p, k: 'wand', b: q.b } : null; overlay() } if (['brush', 'erase', 'pencil', 'line', 'shape', 'grad'].includes(tool)) push(T[tool][1]); else if (['rs', 'es', 'lasso'].includes(tool) && D.sel && D.sel.b.w < 2 && D.sel.b.h < 2) { D.sel = null; overlay() } else if (tool === 'pan') cv.style.cursor = 'grab'; drag = null }
+    addEventListener('pointerup', up1); addEventListener('pointercancel', up1); function up1() { if (pan) { pan = null; cv.style.cursor = curs(); return } if (fl && fl.sn) { fl.sn = null; overlay() } if (!drag) return; if (tool === 'text' && drag.tb) { const a = drag.p, q = drag.q || a, c = drag.tc; drag = null; let x = Math.round(Math.min(a.x, q.x)), y = Math.round(Math.min(a.y, q.y)), w = Math.round(Math.abs(q.x - a.x)), h = Math.round(Math.abs(q.y - a.y)); if (w < 6 && h < 6) { w = 240; h = Math.max(60, Math.round(+$('fs').value * 2.4)) } w = Math.max(w, 8); h = Math.max(h, 8); startText({ x, y, w, h }, c); overlay(); return } if (PP && (tool === 'es' || tool === 'lasso') && D.sel && D.sel.b.w >= 1 && D.sel.b.h >= 1) { const q = maskPath(D.sel.p); D.sel = q ? { p: q.p, k: 'wand', b: q.b } : null; overlay() } if (['brush', 'erase', 'pencil', 'finger', 'line', 'shape', 'grad'].includes(tool)) push(T[tool][1]); else if (['rs', 'es', 'lasso'].includes(tool) && D.sel && D.sel.b.w < 2 && D.sel.b.h < 2) { D.sel = null; overlay() } else if (tool === 'pan') cv.style.cursor = 'grab'; drag = null }
     cv.oncontextmenu = e => e.preventDefault();
     $('scroll').addEventListener('wheel', e => { if (e.ctrlKey) { cpkEnd(); e.preventDefault(); sz(D.zoom * (e.deltaY < 0 ? 1.15 : .87), e) } }, { passive: false });
     $('zo').innerHTML = svg('zo'); $('zi').innerHTML = svg('zi'); $('zf').innerHTML = svg('fit'); $('swap').innerHTML = svg('swap'); $('zi').onclick = () => sz(D.zoom * 1.25); $('zo').onclick = () => sz(D.zoom * .8); $('zs').oninput = e => sz(e.target.value / 100); $('zf').onclick = () => A.fit();
     let cpk = null; function cpkEnd() { if (cpk) { const t = cpk.t; cpk = null; if (tool === 'pick') setTool(t) } }
-    addEventListener('keydown', e => { if (!D || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return; if (e.key === 'Control') { if (!e.repeat && !cpk && !drag && !fl && !tp && !['pick', 'rs', 'es', 'lasso', 'wand'].includes(tool)) { cpk = { t: tool }; setTool('pick') } } else cpkEnd() });
+    addEventListener('keydown', e => { if (!D || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return; if (e.key === 'Control') { if (!e.repeat && !cpk && !drag && !fl && !tp && !['pick', 'rs', 'es', 'lasso', 'wand'].includes(tool)) { cpk = { t: tool }; setTool('pick'); pkUpd() } } else cpkEnd() });
     addEventListener('keyup', e => { if (e.key === 'Control') cpkEnd() }); addEventListener('blur', () => { cpkEnd(); space = false });
     $('scroll').addEventListener('scroll', () => { if (D) overlay() }); addEventListener('resize', () => { if (D) overlay() });
     // ---------- Touch: pinch to zoom, two-finger pan, palm rejection
     const tps = new Map(); let selBak = null, selT = 0, gs = null, penOn = 0, penUp = 0;
     function gCancel() {
-      if (drag) { if (drag.base) { X().putImageData(drag.base, 0, 0); render() } else if (['brush', 'erase', 'pencil'].includes(tool)) { restore(D.hist[D.hi].s); ui() } else if (tool === 'movepx' && fl && drag.s) { Object.assign(fl, drag.s); flDraw() } drag = null }
+      if (drag) { if (drag.base) { X().putImageData(drag.base, 0, 0); render() } else if (BRT.includes(tool)) { restore(D.hist[D.hi].s); ui() } else if (tool === 'movepx' && fl && drag.s) { Object.assign(fl, drag.s); flDraw() } drag = null }
       if (['rs', 'es', 'lasso', 'wand'].includes(tool) && selBak && Date.now() - selT < 4000) D.sel = selBak; overlay(); pan = null
     }
     const g2 = () => { const [a, b] = [...tps.values()]; return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 } };
@@ -1768,7 +1817,7 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     function flDraw() { const x = fl.L.x; x.clearRect(0, 0, D.w, D.h); x.drawImage(fl.base, 0, 0); x.save(); if (PP) { x.imageSmoothingEnabled = false; fl.w = Math.max(1, Math.round(fl.w)); fl.h = Math.max(1, Math.round(fl.h)); const q = Math.round(fl.rot / (Math.PI / 2)) * Math.PI / 2; if (Math.abs(fl.rot - q) < 1e-6) fl.rot = q; if (Math.abs(Math.sin(fl.rot)) < 1e-6 || Math.abs(Math.cos(fl.rot)) < 1e-6) { fl.cx = Math.round(fl.cx - fl.w / 2) + fl.w / 2; fl.cy = Math.round(fl.cy - fl.h / 2) + fl.h / 2 } else { fl.cx = Math.round(fl.cx); fl.cy = Math.round(fl.cy) } } else x.imageSmoothingQuality = 'high'; x.translate(fl.cx, fl.cy); x.rotate(fl.rot); x.drawImage(fl.f, -fl.w / 2, -fl.h / 2, fl.w, fl.h); x.restore(); render() }
     const flLoc = (p, s = fl) => { const c = Math.cos(-s.rot), n = Math.sin(-s.rot), dx = p.x - s.cx, dy = p.y - s.cy; return { x: dx * c - dy * n, y: dx * n + dy * c } };
     function flHit(p) { const l = flLoc(p), r = 8 / D.zoom; if (Math.hypot(l.x, l.y + fl.h / 2 + 24 / D.zoom) < r) return 'rot'; for (const hx of [-1, 0, 1]) for (const hy of [-1, 0, 1]) if ((hx || hy) && Math.hypot(l.x - hx * fl.w / 2, l.y - hy * fl.h / 2) < r) return [hx, hy]; return Math.abs(l.x) <= fl.w / 2 && Math.abs(l.y) <= fl.h / 2 ? 'mv' : null }
-    function hoverCur(p) { const h = flHit(p); cv.style.cursor = h === 'mv' ? 'move' : h === 'rot' ? 'grab' : h ? (h[0] && h[1] ? (h[0] * h[1] > 0 ? 'nwse-resize' : 'nesw-resize') : h[0] ? 'ew-resize' : 'ns-resize') : 'alias' }
+    function hoverCur(p) { const h = flHit(p); cv.style.cursor = h === 'mv' ? 'move' : h === 'rot' ? 'grab' : h ? (h[0] && h[1] ? (h[0] * h[1] > 0 ? 'nwse-resize' : 'nesw-resize') : h[0] ? 'ew-resize' : 'ns-resize') : 'alias'; $('scroll').style.cursor = h ? cv.style.cursor : '' }
     function flDown(p, rb) { if (!fl && !flStart()) { drag = null; return } const h = rb ? null : flHit(p); drag.m = h || 'rot2'; drag.s = { cx: fl.cx, cy: fl.cy, w: fl.w, h: fl.h, rot: fl.rot }; drag.a0 = Math.atan2(p.y - fl.cy, p.x - fl.cx) }
     function flMove(p, e) { const s = drag.s, m = drag.m; if (m === 'mv') { fl.cx = s.cx + p.x - drag.p.x; fl.cy = s.cy + p.y - drag.p.y; snapFl() } else if (m === 'rot' || m === 'rot2') { const q = Math.atan2(p.y - s.cy, p.x - s.cx); let a = m === 'rot' ? q + Math.PI / 2 : s.rot + q - drag.a0; if (e.shiftKey) a = Math.round(a / (Math.PI / 12)) * Math.PI / 12; fl.rot = a } else { const l = flLoc(p, s), [hx, hy] = m; let nw = s.w, nh = s.h; if (hx) nw = Math.max(1, (l.x + hx * s.w / 2) * hx); if (hy) nh = Math.max(1, (l.y + hy * s.h / 2) * hy); if (e.shiftKey && hx && hy) { const k = Math.max(nw / s.w, nh / s.h); nw = s.w * k; nh = s.h * k } const ux = hx ? hx * (nw - s.w) / 2 : 0, uy = hy ? hy * (nh - s.h) / 2 : 0, c = Math.cos(s.rot), n = Math.sin(s.rot); fl.cx = s.cx + ux * c - uy * n; fl.cy = s.cy + ux * n + uy * c; fl.w = nw; fl.h = nh } flDraw() }
     function snapFl() {
@@ -1785,7 +1834,7 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     function startText(box, c) { tp = { ...box, c }; tx.style.display = 'block'; updTx(); tx.value = ''; tx.focus(); setTimeout(() => tx.focus(), 0) }
     function wrapText(c, txt, w) { const out = [], fit = t => c.measureText(t).width <= w; for (const para of txt.split('\n')) { let line = ''; for (const word of para.split(' ')) { const t = line ? line + ' ' + word : word; if (fit(t)) { line = t; continue } if (line) { out.push(line); line = '' } if (fit(word)) { line = word; continue } let cur = ''; for (const ch of word) { if (cur && !fit(cur + ch)) { out.push(cur); cur = ch } else cur += ch } line = cur } out.push(line) } return out }
     function drawTextBox(c, t, txt) { const fs = +$('fs').value, lh = fs * 1.2; c.save(); c.beginPath(); c.rect(t.x, t.y, t.w, t.h); c.clip(); c.font = fontCss(fs); c.textBaseline = 'middle'; wrapText(c, txt, t.w).forEach((l, i) => c.fillText(l, t.x, t.y + i * lh + lh / 2)); c.restore() }
-    function commitText() { commitFl(); if (!tp || tx.style.display === 'none') return; const t = tp, txt = tx.value; tx.style.display = 'none'; tp = null; if (!txt) return; paint(x => { if (PP) { const tc = cvs(D.w, D.h), c = tc.getContext('2d'); c.fillStyle = '#000'; drawTextBox(c, t, txt); const q = t.c.match(/[\d.]+/g); thr(tc, '#' + [0, 1, 2].map(i => (+q[i]).toString(16).padStart(2, '0')).join(''), +q[3]); x.drawImage(tc, 0, 0) } else { x.fillStyle = t.c; drawTextBox(x, t, txt) } }); push('Texte') }
+    function commitText() { commitFl(); if (pl) plEnd(true); if (!tp || tx.style.display === 'none') return; const t = tp, txt = tx.value; tx.style.display = 'none'; tp = null; if (!txt) return; paint(x => { if (PP) { const tc = cvs(D.w, D.h), c = tc.getContext('2d'); c.fillStyle = '#000'; drawTextBox(c, t, txt); const q = t.c.match(/[\d.]+/g); thr(tc, '#' + [0, 1, 2].map(i => (+q[i]).toString(16).padStart(2, '0')).join(''), +q[3]); x.drawImage(tc, 0, 0) } else { x.fillStyle = t.c; drawTextBox(x, t, txt) } }); push('Texte') }
     tx.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitText() } if (e.key === 'Escape') { tx.value = ''; commitText() } }; tx.onpointerdown = e => e.stopPropagation();
     ['ff', 'fs', 'fb', 'fi'].forEach(i => { $(i).addEventListener('input', updTx); $(i).addEventListener('change', () => { updTx(); if (tp && i !== 'fs') tx.focus() }) });
     $('fimp').onclick = () => $('ffile').click();
@@ -1796,10 +1845,20 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     let dlgC = null;
     function dlg(title, P, live, ok, cancel) {
       if (dlgC) { const c = dlgC; dlgC = null; c() } const b = $('dlgb'), v = {}; b.innerHTML = ''; b.append(E('b', { textContent: tr(title) }));
-      P.forEach(q0 => { const q = { ...q0, l: tr(q0.l) }; v[q.k] = q.v; const f = () => live && live(v); let row; if (q.t === 's') { const a = E('input', { value: q.v, oninput: () => { v[q.k] = a.value; f() } }); row = E('label', { textContent: q.l }, a) } else if (q.t === 'o') { const a = E('select', { onchange: () => { v[q.k] = a.value; f() } }, ...q.o.map(o => E('option', { textContent: o }))); a.value = q.v; row = E('label', { textContent: q.l }, a) } else if (q.t === 'n') { const a = E('input', { type: 'number', min: q.min, max: q.max, value: q.v, oninput: () => { v[q.k] = +a.value; f() } }); row = E('label', { textContent: q.l }, a) } else { const a = E('input', { type: 'range', min: q.min, max: q.max, value: q.v }), n = E('input', { type: 'number', min: q.min, max: q.max, value: q.v }); a.oninput = () => { n.value = a.value; v[q.k] = +a.value; f() }; n.oninput = () => { a.value = n.value; v[q.k] = +n.value; f() }; row = E('label', { textContent: q.l }, a, n) } b.append(row) });
-      const close = () => { $('dlg').style.display = 'none'; dlgC = null }; dlgC = cancel || null; b.append(E('div', { className: 'bt' }, E('button', { textContent: 'OK', onclick: () => { close(); ok && ok(v) } }), E('button', { textContent: ({ fr: 'Annuler', en: 'Cancel', es: 'Cancelar', de: 'Abbrechen', ja: 'キャンセル' })[LANG] || 'Cancel', onclick: () => { close(); cancel && cancel() } }))); $('dlg').style.display = 'block'; dlgFit(); live && live(v)
+      P.forEach(q0 => { const q = { ...q0, l: tr(q0.l) }; v[q.k] = q.v; const f = () => live && live(v); let row; if (q.t === 's') { const a = E('input', { value: q.v, oninput: () => { v[q.k] = a.value; f() } }); row = E('label', { textContent: q.l }, a) } else if (q.t === 'o') { const a = E('select', { onchange: () => { v[q.k] = a.value; f() } }, ...q.o.map(o => E('option', { textContent: o }))); a.value = q.v; row = E('label', { textContent: q.l }, a) } else if (q.t === 'c') { const a = E('input', { type: 'color', value: q.v, oninput: () => { v[q.k] = a.value; f() } }), pb = E('button', { type: 'button', textContent: '💧', title: tr('Pipette : cliquez sur l’image'), style: 'margin-left:6px;padding:1px 6px', onclick: e => { e.preventDefault(); if (dlgPick && dlgPick.btn === pb) { pickStop(); return } pickStart(pb, h => { a.value = h; v[q.k] = h; f() }) } }); row = E('label', { textContent: q.l }, a, pb) } else if (q.t === 'n') { const a = E('input', { type: 'number', min: q.min, max: q.max, value: q.v, oninput: () => { v[q.k] = +a.value; f() } }); row = E('label', { textContent: q.l }, a) } else { const a = E('input', { type: 'range', min: q.min, max: q.max, value: q.v }), n = E('input', { type: 'number', min: q.min, max: q.max, value: q.v }); a.oninput = () => { n.value = a.value; v[q.k] = +a.value; f() }; n.oninput = () => { a.value = n.value; v[q.k] = +n.value; f() }; row = E('label', { textContent: q.l }, a, n) } b.append(row) });
+      const close = () => { pickStop(); fxBaseData = null; $('dlg').style.display = 'none'; dlgC = null }; dlgC = cancel || null; b.append(E('div', { className: 'bt' }, E('button', { textContent: 'OK', onclick: () => { close(); ok && ok(v) } }), E('button', { textContent: ({ fr: 'Annuler', en: 'Cancel', es: 'Cancelar', de: 'Abbrechen', ja: 'キャンセル' })[LANG] || 'Cancel', onclick: () => { close(); cancel && cancel() } }))); $('dlg').style.display = 'block'; dlgFit(); live && live(v)
     }
-    function conv(im, k, add) { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data; for (let y = 0; y < H; y++)for (let x = 0; x < W; x++)for (let c = 0; c < 3; c++) { let v = add; for (let j = -1; j < 2; j++)for (let i = -1; i < 2; i++)v += s[(Math.min(H - 1, Math.max(0, y + j)) * W + Math.min(W - 1, Math.max(0, x + i))) * 4 + c] * k[(j + 1) * 3 + i + 1]; o[(y * W + x) * 4 + c] = v } }
+    function conv(im, k, add) {
+      // unrolled 3×3 kernel, row/column offsets computed once per pixel
+      const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, k0 = k[0], k1 = k[1], k2 = k[2], k3 = k[3], k4 = k[4], k5 = k[5], k6 = k[6], k7 = k[7], k8 = k[8];
+      for (let y = 0; y < H; y++) {
+        const a = Math.max(0, y - 1) * W * 4, b = y * W * 4, c = Math.min(H - 1, y + 1) * W * 4;
+        for (let x = 0; x < W; x++) {
+          const l = Math.max(0, x - 1) * 4, m = x * 4, r = Math.min(W - 1, x + 1) * 4;
+          for (let ch = 0; ch < 3; ch++) o[b + m + ch] = add + s[a + l + ch] * k0 + s[a + m + ch] * k1 + s[a + r + ch] * k2 + s[b + l + ch] * k3 + s[b + m + ch] * k4 + s[b + r + ch] * k5 + s[c + l + ch] * k6 + s[c + m + ch] * k7 + s[c + r + ch] * k8
+        }
+      }
+    }
     const rng = g => { let z = g | 0; return () => { z = z + 0x6D2B79F5 | 0; let t = Math.imul(z ^ z >>> 15, 1 | z); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 } };
     const POSL = () => ['Extérieur', 'Intérieur', 'Centré'];
     function edt(W, H, feat) {
@@ -1812,12 +1871,107 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
       bc: { n: 'Luminosité / Contraste', p: [{ k: 'b', l: 'Luminosité', min: -100, max: 100, v: 0 }, { k: 'c', l: 'Contraste', min: -100, max: 100, v: 0 }], f: p => `brightness(${1 + p.b / 100}) contrast(${1 + p.c / 100})` },
       hs: { n: 'Teinte / Saturation', p: [{ k: 'h', l: 'Teinte', min: -180, max: 180, v: 0 }, { k: 's', l: 'Saturation', min: 0, max: 300, v: 100 }, { k: 'l', l: 'Luminosité', min: 0, max: 200, v: 100 }], f: p => `hue-rotate(${p.h}deg) saturate(${p.s}%) brightness(${p.l}%)` },
       bw: { n: 'Noir et blanc', f: () => 'grayscale(1)' }, sepia: { n: 'Sépia', f: () => 'sepia(1)' }, inv: { n: 'Inverser les couleurs', f: () => 'invert(1)' },
+      ialpha: { n: 'Inverser l’alpha', px: im => { const d = im.data; for (let k = 3; k < d.length; k += 4) d[k] = 255 - d[k] } },
+      shadow: {
+        n: 'Ombre portée', get p() { return [{ k: 'x', l: 'Décalage X', min: -100, max: 100, v: 12 }, { k: 'y', l: 'Décalage Y', min: -100, max: 100, v: 7 }, { k: 'w', l: 'Rayon d’élargissement', min: 0, max: 50, v: 3 }, { k: 'b', l: 'Rayon de flou', min: 0, max: 50, v: 8 }, { k: 'o', l: 'Opacité de l’ombre', min: 0, max: 255, v: 255 }, { k: 'c', l: 'Couleur de l’ombre', t: 'c', v: '#b5b5b5' }, { k: 'k', l: 'Conserver l’image originale', t: 'o', o: [tr('Oui'), tr('Non')], v: tr('Oui') }] },
+        c: (t, s, p, w, h) => {
+          const sil = cvs(w, h), sx = sil.getContext('2d'), R = p.w;
+          if (R > 0) { const n = Math.max(8, Math.ceil(R * 4)); for (let i = 0; i < n; i++) { const a = i / n * 6.2832; sx.drawImage(s, Math.cos(a) * R, Math.sin(a) * R) } if (R > 3) for (let i = 0; i < n; i++) { const a = i / n * 6.2832; sx.drawImage(s, Math.cos(a) * R / 2, Math.sin(a) * R / 2) } }
+          sx.drawImage(s, 0, 0); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = p.c; sx.fillRect(0, 0, w, h);
+          t.save(); t.globalAlpha = p.o / 255; if (p.b > 0) t.filter = `blur(${p.b}px)`; t.drawImage(sil, p.x, p.y); t.restore();
+          if (p.k !== tr('Non')) t.drawImage(s, 0, 0)
+        }
+      },
+      redeye: {
+        n: 'Suppression des yeux rouges', p: [{ k: 't', l: 'Tolérance', min: 0, max: 100, v: 70 }, { k: 's', l: 'Pourcentage de saturation', min: 0, max: 100, v: 90 }],
+        px: (im, p) => { const d = im.data, ratio = 2.5 - p.t * .012, S = p.s / 100; for (let k = 0; k < d.length; k += 4) { const r = d[k], g = d[k + 1], b = d[k + 2], m = Math.max(g, b) + 1; if (r > 60 && r / m > ratio) { const w = Math.min(1, (r / m - ratio) * 1.5 + .4), t = (g + b) / 2 * .9; d[k] = r + (t - r) * S * w } } }
+      },
+      kodak: {
+        n: 'Effets pellicule Kodak', get p() { return [{ k: 'f', l: 'Pellicule', t: 'o', o: Object.keys(KOD), v: Object.keys(KOD)[0] }, { k: 'i', l: 'Intensité', min: 0, max: 100, v: 100 }, { k: 'g', l: 'Grain', min: 0, max: 100, v: 20 }] },
+        px: (im, p) => {
+          const K = KOD[p.f] || KOD[Object.keys(KOD)[0]], d = im.data, I = p.i / 100, G = p.g * .6, r = rng(3), f = (c, t) => { c = (c - 128) * K.c + 128 + t; return K.l + c * (255 - K.l) / 255 };
+          for (let k = 0; k < d.length; k += 4) { const R = d[k], Gc = d[k + 1], B = d[k + 2], l = .299 * R + .587 * Gc + .114 * B; let a = l + (R - l) * K.s, b = l + (Gc - l) * K.s, c = l + (B - l) * K.s; if (K.bw) a = b = c = l; a = f(a, K.t[0]); b = f(b, K.t[1]); c = f(c, K.t[2]); const n = (r() - .5) * G * (K.bw ? 1.6 : 1); d[k] = R + (a + n - R) * I; d[k + 1] = Gc + (b + n - Gc) * I; d[k + 2] = B + (c + n - B) * I }
+        }
+      },
+      cafill: {
+        n: 'Remplissage selon le contenu', heavy: 1, sel: 1, p: [{ k: 'r', l: 'Taille du patch (px)', min: 2, max: 10, v: 4 }, { k: 'i', l: 'Itérations', min: 2, max: 15, v: 6 }, { k: 'm', l: 'Zone d’échantillonnage (marge px)', min: 10, max: 400, v: 120 }],
+        px: (im, p) => { try { cafill(im, p) } catch (e) { say(tr('Mémoire insuffisante : réduisez la sélection ou la zone d’échantillonnage.')) } }
+      },
+      decomp: {
+        n: 'Décompression automatique', get p() { return [{ k: 'f', l: 'Force', min: 0, max: 100, v: 50 }, { k: 'w', l: 'Inclure les ondelettes', t: 'o', o: [tr('Oui'), tr('Non')], v: tr('Oui') }] },
+        px: (im, p) => autoDecompress(im, p)
+      },
+      deblock: {
+        n: 'Déblocage adaptatif', get p() { return [{ k: 'b', l: 'Taille des blocs', min: 4, max: 32, v: 8 }, { k: 'g', l: 'Grille de blocs', t: 'o', o: [tr('Automatique'), tr('Manuelle')], v: tr('Automatique') }, { k: 'x', l: 'Décalage horizontal (grille manuelle)', min: 0, max: 31, v: 0 }, { k: 'y', l: 'Décalage vertical (grille manuelle)', min: 0, max: 31, v: 0 }, { k: 't', l: 'Seuil (écart considéré comme artificiel)', min: 1, max: 64, v: 28 }, { k: 'f', l: 'Force', min: 0, max: 50, v: 45 }, { k: 'n', l: 'Pixels corrigés de chaque côté', min: 1, max: 3, v: 2 }, { k: 's', l: 'Protection des textures', min: 0, max: 100, v: 45 }] },
+        px: (im, p) => deblock(im, p)
+      },
+      deringing: {
+        n: 'Réduction des halos', p: [{ k: 'e', l: 'Seuil de contour', min: 20, max: 300, v: 60 }, { k: 'r', l: 'Distance autour du contour (px)', min: 1, max: 6, v: 4 }, { k: 'f', l: 'Rayon du filtre', min: 1, max: 3, v: 2 }, { k: 'a', l: 'Tolérance des halos (amplitude)', min: 2, max: 40, v: 16 }, { k: 's', l: 'Force', min: 0, max: 100, v: 90 }],
+        px: (im, p) => deringing(im, p)
+      },
+      wavelet: {
+        n: 'Débruitage par ondelettes', get p() { return [{ k: 'w', l: 'Ondelette', t: 'o', o: ['Haar', 'CDF 5/3'], v: 'Haar' }, { k: 'l', l: 'Niveaux de décomposition', min: 1, max: 3, v: 2 }, { k: 'a', l: 'Mode du seuil (automatique : bruit, manuel : artefacts de compression)', t: 'o', o: [tr('Automatique'), tr('Manuel')], v: tr('Automatique') }, { k: 'k', l: 'Force (seuil automatique, %)', min: 10, max: 400, v: 150 }, { k: 'y', l: 'Seuil luminance (manuel)', min: 0, max: 60, v: 6 }, { k: 'c', l: 'Seuil chrominance (manuel)', min: 0, max: 80, v: 12 }, { k: 'm', l: 'Seuillage', t: 'o', o: [tr('Doux'), tr('Dur')], v: tr('Doux') }, { k: 'q', l: 'Qualité', t: 'o', o: [tr('Rapide'), tr('Lissé'), tr('Très lissé')], v: tr('Lissé') }] },
+        px: (im, p) => waveletDenoise(im, p)
+      },
+      palcomp: {
+        n: 'Compression par palette', get p() { return [{ k: 'n', l: 'Nombre de couleurs', min: 2, max: 256, v: 32 }, { k: 'd', l: 'Tramage', t: 'o', o: [tr('Aucun'), 'Floyd–Steinberg', 'Atkinson', tr('Ordonné (Bayer)')], v: 'Floyd–Steinberg' }, { k: 's', l: 'Intensité du tramage', min: 0, max: 100, v: 80 }, { k: 'i', l: 'Affinage de la palette (itérations)', min: 0, max: 5, v: 2 }] },
+        px: (im, p) => paletteCompress(im, p)
+      },
       post: { n: 'Posteriser', p: [{ k: 'n', l: 'Niveaux', min: 2, max: 16, v: 4 }], px: (im, p) => { const d = im.data, s = 255 / (p.n - 1); for (let k = 0; k < d.length; k++)if (k % 4 < 3) d[k] = Math.round(d[k] / s) * s } },
       gauss: { n: 'Flou gaussien', p: [{ k: 'r', l: 'Rayon', min: 0, max: 100, v: 8 }], f: p => `blur(${p.r}px)` },
-      oil: { n: 'Peinture à l’huile', p: [{ k: 'r', l: 'Taille du pinceau', min: 1, max: 8, v: 3 }, { k: 'q', l: 'Niveaux', min: 8, max: 64, v: 20 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, q = p.q, r = p.r, c = new Int32Array(q), R = new Int32Array(q), G = new Int32Array(q), B = new Int32Array(q); for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { c.fill(0); R.fill(0); G.fill(0); B.fill(0); for (let j = Math.max(0, y - r); j <= Math.min(H - 1, y + r); j++)for (let i = Math.max(0, x - r); i <= Math.min(W - 1, x + r); i++) { const k = (j * W + i) * 4, b = ((s[k] + s[k + 1] + s[k + 2]) / 3 * q / 256) | 0; c[b]++; R[b] += s[k]; G[b] += s[k + 1]; B[b] += s[k + 2] } let m = 0; for (let b = 1; b < q; b++)if (c[b] > c[m]) m = b; const k = (y * W + x) * 4; if (c[m]) { o[k] = R[m] / c[m]; o[k + 1] = G[m] / c[m]; o[k + 2] = B[m] / c[m] } } } },
+      oil: {
+        n: 'Peinture à l’huile', p: [{ k: 'r', l: 'Taille du pinceau', min: 1, max: 8, v: 3 }, { k: 'q', l: 'Niveaux', min: 8, max: 64, v: 20 }], px: (im, p) => {
+          // sliding histogram: cost is proportional to (2r+1) per pixel instead of (2r+1)²
+          const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, q = p.q, r = p.r, N = W * H, bin = new Uint8Array(N);
+          for (let i = 0, k = 0; i < N; i++, k += 4) bin[i] = ((s[k] + s[k + 1] + s[k + 2]) / 3 * q / 256) | 0;
+          const c = new Int32Array(q), R = new Int32Array(q), G = new Int32Array(q), B = new Int32Array(q);
+          for (let y = 0; y < H; y++) {
+            c.fill(0); R.fill(0); G.fill(0); B.fill(0); const j0 = Math.max(0, y - r), j1 = Math.min(H - 1, y + r);
+            const col = (x, sg) => { for (let j = j0; j <= j1; j++) { const i = j * W + x, k = i * 4, b = bin[i]; c[b] += sg; R[b] += sg * s[k]; G[b] += sg * s[k + 1]; B[b] += sg * s[k + 2] } };
+            for (let x = 0, e = Math.min(W - 1, r); x <= e; x++) col(x, 1);
+            for (let x = 0; x < W; x++) {
+              if (x > 0) { if (x + r < W) col(x + r, 1); if (x - r - 1 >= 0) col(x - r - 1, -1) }
+              let m = 0; for (let b = 1; b < q; b++) if (c[b] > c[m]) m = b;
+              if (c[m]) { const k = (y * W + x) * 4, n = c[m]; o[k] = R[m] / n; o[k + 1] = G[m] / n; o[k + 2] = B[m] / n }
+            }
+          }
+        }
+      },
       pix: { n: 'Pixeliser', p: [{ k: 's', l: 'Taille des cellules', min: 2, max: 100, v: 8 }], c: (t, s, p, w, h) => { const m = cvs(Math.ceil(w / p.s), Math.ceil(h / p.s)); m.getContext('2d').drawImage(s, 0, 0, m.width, m.height); t.imageSmoothingEnabled = false; t.drawImage(m, 0, 0, m.width * p.s, m.height * p.s) } },
-      dent: { n: 'Bosselures', p: [{ k: 's', l: 'Échelle', min: 2, max: 100, v: 25 }, { k: 'a', l: 'Réfraction', min: 0, max: 100, v: 30 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, f = 6 / p.s, a = p.a / 5; for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const sx = Math.min(W - 1, Math.max(0, Math.round(x + Math.sin(y * f + Math.cos(x * f * .7) * 2) * a))), sy = Math.min(H - 1, Math.max(0, Math.round(y + Math.cos(x * f + Math.sin(y * f * .7) * 2) * a))), i = (sy * W + sx) * 4, k = (y * W + x) * 4; o[k] = s[i]; o[k + 1] = s[i + 1]; o[k + 2] = s[i + 2]; o[k + 3] = s[i + 3] } } },
-      dn: { n: 'Réduction du bruit', p: [{ k: 'r', l: 'Rayon', min: 1, max: 2, v: 1 }, { k: 's', l: 'Force', min: 0, max: 100, v: 70 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, r = p.r, a = p.s / 100, w = new Uint8Array((2 * r + 1) ** 2), h = w.length >> 1; for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const k = (y * W + x) * 4; for (let c = 0; c < 3; c++) { let n = 0; for (let j = -r; j <= r; j++) { const yy = Math.min(H - 1, Math.max(0, y + j)) * W; for (let i = -r; i <= r; i++)w[n++] = s[(yy + Math.min(W - 1, Math.max(0, x + i))) * 4 + c] } w.sort(); o[k + c] = s[k + c] + (w[h] - s[k + c]) * a } } } },
+      dent: {
+        n: 'Bosselures', p: [{ k: 's', l: 'Échelle', min: 2, max: 100, v: 25 }, { k: 'a', l: 'Réfraction', min: 0, max: 100, v: 30 }], px: (im, p) => {
+          // sin/cos only depend on x or on y: computed once per column / per row (angle-addition formulas)
+          const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, f = 6 / p.s, a = p.a / 5, sB = new Float64Array(W), cB = new Float64Array(W), sX = new Float64Array(W), cX = new Float64Array(W);
+          for (let x = 0; x < W; x++) { const B = Math.cos(x * f * .7) * 2; sB[x] = Math.sin(B); cB[x] = Math.cos(B); sX[x] = Math.sin(x * f); cX[x] = Math.cos(x * f) }
+          for (let y = 0; y < H; y++) {
+            const sY = Math.sin(y * f), cY = Math.cos(y * f), D = Math.sin(y * f * .7) * 2, sD = Math.sin(D), cD = Math.cos(D);
+            for (let x = 0; x < W; x++) {
+              const sx = Math.min(W - 1, Math.max(0, Math.round(x + (sY * cB[x] + cY * sB[x]) * a))), sy = Math.min(H - 1, Math.max(0, Math.round(y + (cX[x] * cD - sX[x] * sD) * a))), i = (sy * W + sx) * 4, k = (y * W + x) * 4;
+              o[k] = s[i]; o[k + 1] = s[i + 1]; o[k + 2] = s[i + 2]; o[k + 3] = s[i + 3]
+            }
+          }
+        }
+      },
+      dn: {
+        n: 'Réduction du bruit', p: [{ k: 'r', l: 'Rayon', min: 1, max: 2, v: 1 }, { k: 's', l: 'Force', min: 0, max: 100, v: 70 }], px: (im, p) => {
+          // median filter with a sliding histogram (same result as sorting the window, without sorting)
+          const W = im.width, H = im.height, d = im.data, r = p.r, a = p.s / 100, half = ((2 * r + 1) ** 2) >> 1, N = W * H, pl = new Uint8Array(N), out = new Uint8Array(N), hist = new Int32Array(256), rows = new Int32Array(2 * r + 1);
+          for (let ch = 0; ch < 3; ch++) {
+            for (let i = 0; i < N; i++) pl[i] = d[i * 4 + ch];
+            for (let y = 0; y < H; y++) {
+              hist.fill(0); let m = 0, lt = 0; for (let j = -r; j <= r; j++) rows[j + r] = Math.min(H - 1, Math.max(0, y + j)) * W;
+              for (let n = 0; n < rows.length; n++) for (let i = -r; i <= r; i++) hist[pl[rows[n] + Math.min(W - 1, Math.max(0, i))]]++;
+              for (let x = 0; x < W; x++) {
+                if (x > 0) { const ad = Math.min(W - 1, x + r), rm = Math.max(0, x - r - 1); for (let n = 0; n < rows.length; n++) { const va = pl[rows[n] + ad], vr = pl[rows[n] + rm]; hist[va]++; if (va < m) lt++; hist[vr]--; if (vr < m) lt-- } }
+                while (lt + hist[m] <= half) { lt += hist[m]; m++ }
+                while (lt > half) { m--; lt -= hist[m] }
+                out[y * W + x] = m
+              }
+            }
+            for (let i = 0; i < N; i++) d[i * 4 + ch] = pl[i] + (out[i] - pl[i]) * a
+          }
+        }
+      },
       noise: { n: 'Ajouter du bruit', p: [{ k: 'i', l: 'Intensité', min: 0, max: 100, v: 30 }], px: (im, p) => { const d = im.data, n = p.i * 2.55; for (let k = 0; k < d.length; k += 4) { const v = (Math.random() - .5) * n * 2; d[k] += v; d[k + 1] += v; d[k + 2] += v } } },
       sharp: { n: 'Netteté', p: [{ k: 'a', l: 'Quantité', min: 0, max: 100, v: 50 }], px: (im, p) => { const a = p.a / 50; conv(im, [0, -a, 0, -a, 1 + 4 * a, -a, 0, -a, 0], 0) } },
       vig: { n: 'Vignette', p: [{ k: 'i', l: 'Intensité', min: 0, max: 100, v: 60 }], c: (t, s, p, w, h) => { t.drawImage(s, 0, 0); const g = t.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .25, w / 2, h / 2, Math.hypot(w, h) / 2); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${p.i / 100})`); t.fillStyle = g; t.fillRect(0, 0, w, h) } },
@@ -1825,8 +1979,29 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
       zblur: { n: 'Flou de zoom', p: [{ k: 'a', l: 'Force', min: 1, max: 100, v: 20 }], c: (t, s, p, w, h) => { const n = 20; for (let i = 0; i < n; i++) { const k = 1 + p.a / 100 * i / (n - 1); t.globalAlpha = 1 / (i + 1); t.save(); t.translate(w / 2, h / 2); t.scale(k, k); t.translate(-w / 2, -h / 2); t.drawImage(s, 0, 0); t.restore() } t.globalAlpha = 1 } },
       chrom: { n: 'Aberration chromatique', p: [{ k: 'd', l: 'Décalage', min: 1, max: 60, v: 6 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, d = p.d; for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const k = (y * W + x) * 4; o[k] = s[(y * W + Math.max(0, x - d)) * 4]; o[k + 2] = s[(y * W + Math.min(W - 1, x + d)) * 4 + 2] } } },
       glitch: { n: 'Effet glitch', p: [{ k: 'i', l: 'Intensité', min: 1, max: 100, v: 30 }, { k: 'g', l: 'Graine', min: 1, max: 999, v: 1 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, r = rng(p.g), cl = v => Math.min(W - 1, Math.max(0, v)); let y = 0; while (y < H) { const bh = (1 + r() * H / 8) | 0; if (r() < p.i / 100) { const sh = ((r() - .5) * W * p.i / 250) | 0; for (let j = y; j < Math.min(H, y + bh); j++)for (let x = 0; x < W; x++) { const k = (j * W + x) * 4, q = (j * W + cl(x - sh)) * 4; o[k] = s[q]; o[k + 1] = s[q + 1]; o[k + 2] = s[(j * W + cl(x - sh - 5)) * 4 + 2]; o[k + 3] = s[q + 3] } } y += bh } } },
-      crys: { n: 'Cristalliser', p: [{ k: 's', l: 'Taille des cellules', min: 4, max: 100, v: 20 }, { k: 'g', l: 'Graine', min: 1, max: 999, v: 1 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, S = p.s, cw = Math.ceil(W / S), ch = Math.ceil(H / S), r = rng(p.g), P = new Float32Array(cw * ch * 2); for (let i = 0; i < cw * ch; i++) { P[i * 2] = (i % cw + r()) * S; P[i * 2 + 1] = ((i / cw | 0) + r()) * S } for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const cx = x / S | 0, cy = y / S | 0; let b = 1e18, bi = 0; for (let j = Math.max(0, cy - 1); j <= Math.min(ch - 1, cy + 1); j++)for (let i = Math.max(0, cx - 1); i <= Math.min(cw - 1, cx + 1); i++) { const q = j * cw + i, dx = P[q * 2] - x, dy = P[q * 2 + 1] - y, d = dx * dx + dy * dy; if (d < b) { b = d; bi = q } } const q = (Math.min(H - 1, P[bi * 2 + 1] | 0) * W + Math.min(W - 1, P[bi * 2] | 0)) * 4, k = (y * W + x) * 4; o[k] = s[q]; o[k + 1] = s[q + 1]; o[k + 2] = s[q + 2]; o[k + 3] = s[q + 3] } } },
-      swirl: { n: 'Tourbillon', p: [{ k: 'a', l: 'Angle', min: -720, max: 720, v: 180 }, { k: 'r', l: 'Rayon', min: 1, max: 100, v: 50 }], px: (im, p) => { const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, cx = W / 2, cy = H / 2, R = p.r / 100 * Math.hypot(W, H) / 2, A = p.a * Math.PI / 180; for (let y = 0; y < H; y++)for (let x = 0; x < W; x++) { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy); if (d >= R) continue; const f = 1 - d / R, a = A * f * f, c = Math.cos(a), n = Math.sin(a), sx = Math.min(W - 1, Math.max(0, Math.round(cx + dx * c - dy * n))), sy = Math.min(H - 1, Math.max(0, Math.round(cy + dx * n + dy * c))), q = (sy * W + sx) * 4, k = (y * W + x) * 4; o[k] = s[q]; o[k + 1] = s[q + 1]; o[k + 2] = s[q + 2]; o[k + 3] = s[q + 3] } } },
+      crys: {
+        n: 'Cristalliser', p: [{ k: 's', l: 'Taille des cellules', min: 4, max: 100, v: 20 }, { k: 'g', l: 'Graine', min: 1, max: 999, v: 1 }], px: (im, p) => {
+          // the 9 candidate points are the same for every pixel of a cell: listed once per cell
+          const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, S = p.s, cw = Math.ceil(W / S), ch = Math.ceil(H / S), r = rng(p.g), P = new Float32Array(cw * ch * 2), SRC = new Int32Array(cw * ch);
+          for (let i = 0; i < cw * ch; i++) { P[i * 2] = (i % cw + r()) * S; P[i * 2 + 1] = ((i / cw | 0) + r()) * S; SRC[i] = (Math.min(H - 1, P[i * 2 + 1] | 0) * W + Math.min(W - 1, P[i * 2] | 0)) * 4 }
+          const qx = new Float64Array(9), qy = new Float64Array(9), qs = new Int32Array(9);
+          for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+            let n = 0; for (let j = Math.max(0, cy - 1); j <= Math.min(ch - 1, cy + 1); j++) for (let i = Math.max(0, cx - 1); i <= Math.min(cw - 1, cx + 1); i++) { const q = j * cw + i; qx[n] = P[q * 2]; qy[n] = P[q * 2 + 1]; qs[n++] = SRC[q] }
+            const x1 = Math.min(W, cx * S + S), y1 = Math.min(H, cy * S + S);
+            for (let y = cy * S; y < y1; y++) for (let x = cx * S; x < x1; x++) { let b = 1e18, bi = 0; for (let t = 0; t < n; t++) { const dx = qx[t] - x, dy = qy[t] - y, d = dx * dx + dy * dy; if (d < b) { b = d; bi = t } } const q = qs[bi], k = (y * W + x) * 4; o[k] = s[q]; o[k + 1] = s[q + 1]; o[k + 2] = s[q + 2]; o[k + 3] = s[q + 3] }
+          }
+        }
+      },
+      swirl: {
+        n: 'Tourbillon', p: [{ k: 'a', l: 'Angle', min: -720, max: 720, v: 180 }, { k: 'r', l: 'Rayon', min: 1, max: 100, v: 50 }], px: (im, p) => {
+          // only the box around the disc is visited
+          const W = im.width, H = im.height, s = new Uint8ClampedArray(im.data), o = im.data, cx = W / 2, cy = H / 2, R = p.r / 100 * Math.hypot(W, H) / 2, A = p.a * Math.PI / 180;
+          for (let y = Math.max(0, Math.floor(cy - R)), ye = Math.min(H - 1, Math.ceil(cy + R)); y <= ye; y++) for (let x = Math.max(0, Math.floor(cx - R)), xe = Math.min(W - 1, Math.ceil(cx + R)); x <= xe; x++) {
+            const dx = x - cx, dy = y - cy, d = Math.sqrt(dx * dx + dy * dy); if (d >= R) continue; const f = 1 - d / R, a = A * f * f, c = Math.cos(a), n = Math.sin(a), sx = Math.min(W - 1, Math.max(0, Math.round(cx + dx * c - dy * n))), sy = Math.min(H - 1, Math.max(0, Math.round(cy + dx * n + dy * c))), q = (sy * W + sx) * 4, k = (y * W + x) * 4;
+            o[k] = s[q]; o[k + 1] = s[q + 1]; o[k + 2] = s[q + 2]; o[k + 3] = s[q + 3]
+          }
+        }
+      },
       half: { n: 'Trame de points', p: [{ k: 's', l: 'Taille des cellules', min: 3, max: 40, v: 8 }], c: (t, s, p, w, h) => { const S = p.s, cw = Math.ceil(w / S), ch = Math.ceil(h / S), m = cvs(cw, ch), mx = m.getContext('2d'); mx.drawImage(s, 0, 0, cw, ch); const d = mx.getImageData(0, 0, cw, ch).data; t.fillStyle = '#fff'; t.fillRect(0, 0, w, h); t.fillStyle = '#000'; for (let j = 0; j < ch; j++)for (let i = 0; i < cw; i++) { const k = (j * cw + i) * 4, l = (.3 * d[k] + .59 * d[k + 1] + .11 * d[k + 2]) / 255, r = (1 - l) * S * .75; if (r > .3) { t.beginPath(); t.arc((i + .5) * S, (j + .5) * S, r, 0, 7); t.fill() } } } },
       glow: { n: 'Lueur', p: [{ k: 'r', l: 'Rayon', min: 1, max: 60, v: 12 }, { k: 'i', l: 'Intensité', min: 0, max: 100, v: 60 }], c: (t, s, p) => { t.drawImage(s, 0, 0); t.globalCompositeOperation = 'screen'; t.globalAlpha = p.i / 100; t.filter = `blur(${p.r}px) brightness(1.3)`; t.drawImage(s, 0, 0); t.filter = 'none'; t.globalAlpha = 1; t.globalCompositeOperation = 'source-over' } },
       duo: { n: 'Duotone (couleurs 1→2)', px: im => { const d = im.data, a = rgb(c1), b = rgb(c2); for (let k = 0; k < d.length; k += 4) { const l = (.3 * d[k] + .59 * d[k + 1] + .11 * d[k + 2]) / 255; for (let c = 0; c < 3; c++)d[k + c] = a[c] + (b[c] - a[c]) * l } } },
@@ -1846,15 +2021,15 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
         }
       }
     };
-    function runFx(id) {
-      const f = FX[id], x = X(), base = x.getImageData(0, 0, D.w, D.h), bc = cvs(D.w, D.h); bc.getContext('2d').putImageData(base, 0, 0);
+    function runFx(id) { if (FX[id].sel && !D.sel) { say(tr('Faites d’abord une sélection de la zone à remplir.')); return }
+      const f = FX[id], x = X(), base = x.getImageData(0, 0, D.w, D.h), bc = cvs(D.w, D.h); bc.getContext('2d').putImageData(base, 0, 0); fxBaseData = base;
       const apply = p => { const t = cvs(D.w, D.h), tx = t.getContext('2d'); if (f.f) { tx.filter = f.f(p); tx.drawImage(bc, 0, 0) } else if (f.c) f.c(tx, bc, p, D.w, D.h); else { const im = new ImageData(new Uint8ClampedArray(base.data), D.w, D.h); f.px(im, p); tx.putImageData(im, 0, 0) } x.putImageData(base, 0, 0); commitCanvas(t) };
       if (!f.p) { apply({}); push(f.n); return }
-      let pend = null, raf = 0; dlg(f.n, f.p, v => { pend = { ...v }; if (!raf) raf = requestAnimationFrame(() => { raf = 0; apply(pend) }) }, v => { apply(v); push(f.n) }, () => { x.putImageData(base, 0, 0); render() })
+      let pend = null, raf = 0; dlg(f.n, f.p, f.heavy ? null : v => { pend = { ...v }; if (!raf) raf = requestAnimationFrame(() => { raf = 0; apply(pend) }) }, v => { apply(v); push(f.n) }, () => { x.putImageData(base, 0, 0); render() })
     }
     // ---------- Actions
     const blob = (type, q) => { const c = cvs(D.w, D.h), x = c.getContext('2d'); if (type === 'image/jpeg') { x.fillStyle = '#fff'; x.fillRect(0, 0, D.w, D.h) } x.drawImage(cv, 0, 0); return new Promise(r => c.toBlob(r, type, q)) };
-    function pasteC(im, x, y) { const w = im.width, h = im.height; if (x < 0 || y < 0 || x + w > D.w || y + h > D.h) { setTool('movepx'); const l = addL(), f = cvs(w, h); f.getContext('2d').drawImage(im, 0, 0); D.sel = null; fl = { f, base: cvs(D.w, D.h), L: l, w, h, cx: x + w / 2, cy: y + h / 2, rot: 0 }; flDraw(); push('Coller'); return } const l = addL(); l.x.drawImage(im, x, y); const p = new Path2D(); p.rect(x, y, w, h); D.sel = { p, k: 'rs', b: { x, y, w, h } }; push('Coller'); setTool('movepx') }
+    function pasteC(im, x, y) { clipFresh = 0; clipUsed = 1; const w = im.width, h = im.height; if (x < 0 || y < 0 || x + w > D.w || y + h > D.h) { setTool('movepx'); const l = addL(), f = cvs(w, h); f.getContext('2d').drawImage(im, 0, 0); D.sel = null; fl = { f, base: cvs(D.w, D.h), L: l, w, h, cx: x + w / 2, cy: y + h / 2, rot: 0 }; flDraw(); push('Coller'); return } const l = addL(); l.x.drawImage(im, x, y); const p = new Path2D(); p.rect(x, y, w, h); D.sel = { p, k: 'rs', b: { x, y, w, h } }; push('Coller'); setTool('movepx') }
     const pasteInternal = () => clip && pasteC(clip.c, clip.x, clip.y);
     function pasteBlob(b) { const im = new Image(); im.onload = () => { pasteC(im, 0, 0); URL.revokeObjectURL(im.src) }; im.src = URL.createObjectURL(b) }
     const addL = n => { const l = mkL(D.w, D.h, n || 'Calque ' + (D.layers.length + 1)); D.layers.splice(D.cur + 1, 0, l); D.cur++; return l };
@@ -2189,7 +2364,7 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
       renderNow(); return blob(e === 'jpg' || e === 'jpeg' ? 'image/jpeg' : e === 'webp' ? 'image/webp' : 'image/png', q)
     }
     async function writeTo(h, q = .92) { const d0 = D; try { const b = await encode(EXT(h.name), q), w = await h.createWritable(); await w.write(b); await w.close(); d0.sv = d0.hist[d0.hi]; ui(); say(tr('Enregistré : ') + h.name); return true } catch (e) { say(tr('Échec de l’enregistrement : ') + e.message); return false } }
-    function dl(name, b) { const a = E('a', { href: URL.createObjectURL(b), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 2000) }
+    function dl(name, b) { if (isNativeApp()) { nativeSave(name, b); return } if (/Android/i.test(navigator.userAgent)) { exportPanel(name, b); return } const a = E('a', { href: URL.createObjectURL(b), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 2000) }
     function mkProject(name, p) {
       if (!(p.w > 0 && p.h > 0 && p.w <= 16384 && p.h <= 16384 && p.layers.length)) throw Error('dimensions invalides');
       const d = { name, w: p.w, h: p.h, layers: p.layers.map(q => { const l = mkL(p.w, p.h, q.name); l.vis = q.vis; l.op = q.op; l.bm = q.bm | 0; l.x.drawImage(q.c, 0, 0); return l }), cur: 0, hist: [], hi: -1, zoom: 1, sel: null };
@@ -2227,27 +2402,29 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     addEventListener('drop', e => { e.preventDefault();[...(e.dataTransfer && e.dataTransfer.files || [])].forEach(f => openFile(f)) });
 
     const A = {
-      new() { dlg('Nouvelle image', [{ k: 'w', l: 'Largeur (px)', t: 'n', min: 1, max: 8000, v: 800 }, { k: 'h', l: 'Hauteur (px)', t: 'n', min: 1, max: 8000, v: 600 }], null, v => mkDoc(Math.max(1, v.w | 0), Math.max(1, v.h | 0), 'Sans titre')) },
       async open() { if (window.showOpenFilePicker) { try { const hs = await showOpenFilePicker({ multiple: true, types: [{ description: tr('Images et projets'), accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg'], 'application/x-kollage': ['.kol'], 'application/x-paintdotnet': ['.pdn'], 'application/x-krita': ['.kra'], 'image/svg+xml': ['.svg'] } }] }); for (const h of hs) { const f = await h.getFile(), e = EXT(f.name); await openFile(f, e === 'kol' || e === 'pdn' || e === 'kra' ? h : null) } return } catch (e) { if (e.name === 'AbortError') return } } $('file').click() },
-      async save() { if (D.file && await writeTo(D.file)) return; A.saveAs() },
+      async save() {
+        if (D.file && await writeTo(D.file)) return;
+        if (D.nUri && hasSaver() && typeof window.KollageAndroid.saveTo === 'function') { try { const bl = await encode(EXT(D.name), .92), r = String(window.KollageAndroid.saveTo(D.nUri, bl.type || mimeOf(D.name), await klB64(bl))); if (r.startsWith('OK:')) { D.sv = D.hist[D.hi]; ui(); say(tr('Enregistré : ') + D.name); return } } catch (e) { } D.nUri = null }
+        A.saveAs()
+      },
       async saveAs() {
-        renderNow(); const base = D.name.replace(/\.\w+$/, ''); if (window.showSaveFilePicker) { try { const h = await showSaveFilePicker({ suggestedName: base + '.kol', types: [{ description: 'Kollage (.kol)', accept: { 'application/x-kollage': ['.kol'] } }, { description: 'Paint.NET (.pdn)', accept: { 'application/x-paintdotnet': ['.pdn'] } }, { description: 'Krita (.kra)', accept: { 'application/x-krita': ['.kra'] } }, { description: 'PNG', accept: { 'image/png': ['.png'] } }, { description: 'JPEG', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }, { description: 'WebP', accept: { 'image/webp': ['.webp'] } }] }); if (await writeTo(h)) { D.file = h; D.name = h.name; ui() } return } catch (e) { if (e.name === 'AbortError') return } }
-        dlg('Enregistrer sous', [{ k: 'n', l: 'Nom', t: 's', v: base }, { k: 'f', l: 'Format', t: 'o', o: ['KOL', 'PDN', 'KRA', 'PNG', 'JPG', 'WebP'], v: 'KOL' }, { k: 'q', l: 'Qualité JPG/WebP', min: 10, max: 100, v: 92 }], null, async v => { const f = v.f.toLowerCase(), name = v.n + '.' + f; try { dl(name, await encode(f, v.q / 100)); D.name = name; D.sv = D.hist[D.hi]; ui() } catch (e) { alert(tr('Échec de l’enregistrement : ') + e.message) } })
+        renderNow(); const base = D.name.replace(/\.\w+$/, ''); if (window.showSaveFilePicker && !isNativeApp() && !/Android/i.test(navigator.userAgent)) { try { const h = await showSaveFilePicker({ suggestedName: base + '.kol', types: [{ description: 'Kollage (.kol)', accept: { 'application/x-kollage': ['.kol'] } }, { description: 'Paint.NET (.pdn)', accept: { 'application/x-paintdotnet': ['.pdn'] } }, { description: 'Krita (.kra)', accept: { 'application/x-krita': ['.kra'] } }, { description: 'PNG', accept: { 'image/png': ['.png'] } }, { description: 'JPEG', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }, { description: 'WebP', accept: { 'image/webp': ['.webp'] } }] }); if (await writeTo(h)) { D.file = h; D.name = h.name; ui() } return } catch (e) { if (e.name === 'AbortError') return } }
+        dlg('Enregistrer sous', [{ k: 'n', l: 'Nom', t: 's', v: base }, { k: 'f', l: 'Format', t: 'o', o: ['KOL', 'PDN', 'KRA', 'PNG', 'JPG', 'WebP'], v: 'KOL' }, { k: 'q', l: 'Qualité JPG/WebP', min: 10, max: 100, v: 92 }], null, async v => { const f = v.f.toLowerCase(), name = v.n + '.' + f; try { const bl = await encode(f, v.q / 100); if (isNativeApp()) { await nativeSave(name, bl); if (window.__klLastUri === null) return; D.nUri = window.__klLastUri || null } else dl(name, bl); D.name = name; D.sv = D.hist[D.hi]; ui() } catch (e) { alert(tr('Échec de l’enregistrement : ') + e.message) } })
       },
       lang() { const O = ['fr', 'en', 'es', 'de', 'ja']; A.setLang(O[(O.indexOf(LANG) + 1) % O.length]) }, setLang(l) { LANG = l; try { localStorage.setItem('pn-lang', LANG) } catch (e) { } relang() }, theme() { const d = document.body.classList.toggle('dark'); try { localStorage.setItem('kl-theme', d ? 'dark' : 'light') } catch (e) { } },
       close() { closeDoc(docs.indexOf(D)) },
       async quit() { for (const d of [...docs]) { if (!await closeDoc(docs.indexOf(d))) return } try { window.close() } catch (e) { } },
       undo() { go(D.hi - 1) }, redo() { go(D.hi + 1) },
-      copy() { const b = D.sel ? D.sel.b : { x: 0, y: 0, w: D.w, h: D.h }, c = cvs(Math.max(1, Math.round(b.w)), Math.max(1, Math.round(b.h))), x = c.getContext('2d'); x.translate(-b.x, -b.y); if (D.sel) x.clip(D.sel.p); x.drawImage(L().c, 0, 0); clip = { c, x: b.x, y: b.y }; try { c.toBlob(bl => navigator.clipboard.write([new ClipboardItem({ 'image/png': bl })]).catch(() => { })) } catch (e) { } say(tr('Copié.')) },
+      copy() { const b = D.sel ? D.sel.b : { x: 0, y: 0, w: D.w, h: D.h }, c = cvs(Math.max(1, Math.round(b.w)), Math.max(1, Math.round(b.h))), x = c.getContext('2d'); x.translate(-b.x, -b.y); if (D.sel) x.clip(D.sel.p); x.drawImage(L().c, 0, 0); clip = { c, x: b.x, y: b.y }; clipFresh = 1; clipUsed = 0; try { c.toBlob(bl => navigator.clipboard.write([new ClipboardItem({ 'image/png': bl })]).catch(() => { })) } catch (e) { } say(tr('Copié.')) },
       erase() { paint(x => x.clearRect(0, 0, D.w, D.h)); push('Effacer la sélection') },
       cut() { A.copy(); A.erase() },
       async paste() { try { for (const it of await navigator.clipboard.read()) { const ty = it.types.find(x => x.startsWith('image/')); if (ty) return pasteBlob(await it.getType(ty)) } } catch (e) { } pasteInternal() },
       all() { const p = new Path2D(); p.rect(0, 0, D.w, D.h); D.sel = { p, k: 'rs', b: { x: 0, y: 0, w: D.w, h: D.h } }; overlay() },
       desel() { D.sel = null; overlay() },
       fillsel() { paint(x => { x.fillStyle = rgba(c1, al1); x.fillRect(0, 0, D.w, D.h) }); push('Remplir la sélection') },
-      zin() { sz(D.zoom * 1.25) }, zout() { sz(D.zoom * .8) }, z100() { sz(1) }, fit() { const s = $('scroll'); sz(Math.min((s.clientWidth - 30) / D.w, (s.clientHeight - 30) / D.h)) }, grid() { grid = !grid; gridUpd(); document.querySelectorAll('#ic button').forEach(b => { if (b.__a === 'grid') b.classList.toggle('on', !!grid) }); if (grid && D.zoom < 6) say(tr('Grille pixel par pixel : zoomez à 600 % ou plus.')) }, pp() { PP = PP ? 0 : 1; document.querySelectorAll('#ic button').forEach(b => { if (b.__a === 'pp') b.classList.toggle('on', !!PP) }); say(tr(PP ? 'Mode pixel perfect activé : tout est dessiné et déplacé au pixel près, sans lissage.' : 'Mode standard (lissé).')) },
+      zin() { sz(D.zoom * 1.25) }, zout() { sz(D.zoom * .8) }, z100() { sz(1) }, fit() { const s = $('scroll'); sz(Math.min((s.clientWidth - 30) / D.w, (s.clientHeight - 30) / D.h)) }, grid() { grid = !grid; gridUpd(); document.querySelectorAll('#ic button').forEach(b => { if (b.__a === 'grid') b.classList.toggle('on', !!grid) }); if (grid && D.zoom < 6) say(tr('Grille pixel par pixel : zoomez à 600 % ou plus.')) }, pp() { PP = PP ? 0 : 1; try { localStorage.setItem('kl-pp', PP) } catch (e) { } document.querySelectorAll('#ic button').forEach(b => { if (b.__a === 'pp') b.classList.toggle('on', !!PP) }); say(tr(PP ? 'Mode pixel perfect activé : tout est dessiné et déplacé au pixel près, sans lissage.' : 'Mode standard (lissé).')) },
       crop() { if (!D.sel) return; const b = D.sel.b, w = Math.max(1, Math.round(b.w)), h = Math.max(1, Math.round(b.h)); xform(w, h, (x, s) => x.drawImage(s, -Math.round(b.x), -Math.round(b.y))); push('Rogner selon la sélection') },
-      resize() { dlg('Redimensionner', [{ k: 'w', l: 'Largeur (px)', t: 'n', min: 1, max: 8000, v: D.w }, { k: 'h', l: 'Hauteur (px)', t: 'n', min: 1, max: 8000, v: D.h }], null, v => { const w = Math.max(1, v.w | 0), h = Math.max(1, v.h | 0); xform(w, h, (x, s) => x.drawImage(s, 0, 0, w, h)); push('Redimensionner') }) },
       flipH() { const w = D.w; xform(D.w, D.h, (x, s) => { x.translate(w, 0); x.scale(-1, 1); x.drawImage(s, 0, 0) }); push('Miroir horizontal') },
       flipV() { const h = D.h; xform(D.w, D.h, (x, s) => { x.translate(0, h); x.scale(1, -1); x.drawImage(s, 0, 0) }); push('Miroir vertical') },
       rotR() { const h = D.h; xform(D.h, D.w, (x, s) => { x.translate(h, 0); x.rotate(Math.PI / 2); x.drawImage(s, 0, 0) }); push('Rotation 90° droite') },
@@ -2266,13 +2443,13 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     // ---------- Menus
     const M = {
       'Fichier': [['Nouveau…', 'new', 'Ctrl+N'], ['Ouvrir…', 'open', 'Ctrl+O'], ['Enregistrer', 'save', 'Ctrl+S'], ['Enregistrer sous…', 'saveAs', 'Ctrl+Maj+S'], '-', ['Fermer l’onglet', 'close'], ['Quitter', 'quit']],
-      'Édition': [['Annuler', 'undo', 'Ctrl+Z'], ['Rétablir', 'redo', 'Ctrl+Y / Ctrl+Maj+Z'], '-', ['Couper', 'cut', 'Ctrl+X'], ['Copier', 'copy', 'Ctrl+C'], ['Coller dans un nouveau calque', 'paste', 'Ctrl+V'], '-', ['Tout sélectionner', 'all', 'Ctrl+A'], ['Désélectionner', 'desel', 'Ctrl+D'], ['Effacer la sélection', 'erase', 'Suppr'], ['Remplir la sélection', 'fillsel']],
+      'Édition': [['Annuler', 'undo', 'Ctrl+Z'], ['Rétablir', 'redo', 'Ctrl+Y / Ctrl+Maj+Z'], '-', ['Couper', 'cut', 'Ctrl+X'], ['Copier', 'copy', 'Ctrl+C'], ['Coller dans un nouveau calque', 'paste', 'Ctrl+V'], '-', ['Tout sélectionner', 'all', 'Ctrl+A'], ['Désélectionner', 'desel', 'Ctrl+D'], ['Effacer la sélection', 'erase', 'Suppr'], ['Remplir la sélection', 'fillsel', 'Entrée'], ['Remplir la sélection (remplace l’alpha)', 'fillalpha', 'Retour arrière']],
       'Affichage': [['Zoom avant', 'zin'], ['Zoom arrière', 'zout'], ['Taille réelle', 'z100'], ['Ajuster à la fenêtre', 'fit'], '-', ['Afficher / masquer la grille', 'grid'], '-', ['Thème sombre / clair', 'theme'], ['Langue / Language', [['Français', 'lang:fr'], ['English', 'lang:en'], ['Español', 'lang:es'], ['Deutsch', 'lang:de'], ['日本語', 'lang:ja']]]],
-      'Image': [['Rogner selon la sélection', 'crop'], ['Redimensionner…', 'resize'], '-', ['Miroir horizontal', 'flipH'], ['Miroir vertical', 'flipV'], ['Rotation 90° à droite', 'rotR'], ['Rotation 90° à gauche', 'rotL'], ['Rotation 180°', 'rot180'], '-', ['Aplatir', 'flatten']],
+      'Image': [['Rogner selon la sélection', 'crop'], ['Redimensionner…', 'resize'], ['Taille de la zone de dessin…', 'canvas', 'Ctrl+Maj+R'], '-', ['Miroir horizontal', 'flipH'], ['Miroir vertical', 'flipV'], ['Rotation 90° à droite', 'rotR'], ['Rotation 90° à gauche', 'rotL'], ['Rotation 180°', 'rot180'], '-', ['Aplatir', 'flatten']],
       'Calques': [['Ajouter un nouveau calque', 'add'], ['Supprimer le calque', 'del'], ['Dupliquer le calque', 'dup'], ['Fusionner vers le bas', 'merge', 'Ctrl+E'], '-', ['Monter le calque', 'up'], ['Descendre le calque', 'down'], ['Propriétés du calque…', 'props']],
-      'Extensions': [['Charger une extension…', 'ext']],
-      'Réglages': [['Luminosité / Contraste…', 'fx:bc'], ['Teinte / Saturation…', 'fx:hs'], ['Noir et blanc', 'fx:bw'], ['Sépia', 'fx:sepia'], ['Inverser les couleurs', 'fx:inv'], ['Posteriser…', 'fx:post'], ['Duotone (couleurs 1→2)', 'fx:duo'], ['Solarisation…', 'fx:sol']],
-      'Effets': [['Artistique', [['Peinture à l’huile…', 'fx:oil']]], ['Flous', [['Flou gaussien…', 'fx:gauss'], ['Flou de mouvement…', 'fx:mblur'], ['Flou de zoom…', 'fx:zblur']]], ['Déformation', [['Pixeliser…', 'fx:pix'], ['Bosselures…', 'fx:dent'], ['Tourbillon…', 'fx:swirl'], ['Cristalliser…', 'fx:crys'], ['Effet glitch…', 'fx:glitch'], ['Aberration chromatique…', 'fx:chrom']]], ['Bruit', [['Ajouter du bruit…', 'fx:noise'], ['Réduire le bruit…', 'fx:dn']]], ['Photo', [['Netteté…', 'fx:sharp'], ['Vignette…', 'fx:vig'], ['Lueur…', 'fx:glow'], ['Trame de points…', 'fx:half']]], ['Styliser', [['Relief', 'fx:emb'], ['Détection des contours', 'fx:edge'], ['Contour d’objet…', 'fx:outline']]]]
+      'Extensions': [['Gestionnaire d’extensions…', 'extmgr'], ['Charger une extension…', 'ext']],
+      'Réglages': [['Luminosité / Contraste…', 'fx:bc'], ['Teinte / Saturation…', 'fx:hs'], ['Noir et blanc', 'fx:bw'], ['Sépia', 'fx:sepia'], ['Inverser les couleurs', 'fx:inv'], ['Posteriser…', 'fx:post'], ['Duotone (couleurs 1→2)', 'fx:duo'], ['Solarisation…', 'fx:sol'], '-', ['Inverser l’alpha', 'fx:ialpha'], ['Palettes…', 'palettes']],
+      'Effets': [['Artistique', [['Peinture à l’huile…', 'fx:oil']]], ['Flous', [['Flou gaussien…', 'fx:gauss'], ['Flou de mouvement…', 'fx:mblur'], ['Flou de zoom…', 'fx:zblur']]], ['Déformation', [['Pixeliser…', 'fx:pix'], ['Bosselures…', 'fx:dent'], ['Tourbillon…', 'fx:swirl'], ['Cristalliser…', 'fx:crys'], ['Effet glitch…', 'fx:glitch'], ['Aberration chromatique…', 'fx:chrom']]], ['Bruit', [['Ajouter du bruit…', 'fx:noise'], ['Réduire le bruit…', 'fx:dn']]], ['Photo', [['Suppression des yeux rouges…', 'fx:redeye'], ['Effets pellicule Kodak…', 'fx:kodak'], ['Netteté…', 'fx:sharp'], ['Vignette…', 'fx:vig'], ['Lueur…', 'fx:glow'], ['Trame de points…', 'fx:half']]], ['Décompresseur', [['Décompression automatique…', 'fx:decomp'], '-', ['Déblocage adaptatif…', 'fx:deblock'], ['Réduction des halos…', 'fx:deringing'], ['Débruitage par ondelettes…', 'fx:wavelet'], '-', ['Compression par palette…', 'fx:palcomp']]], ['Objet', [['Ombre portée…', 'fx:shadow'], ['Remplissage selon le contenu…', 'fx:cafill']]], ['Styliser', [['Relief', 'fx:emb'], ['Détection des contours', 'fx:edge'], ['Contour d’objet…', 'fx:outline']]]]
     };
     const run = a => { if (!D) return; commitText(); a.startsWith('fx:') ? runFx(a.slice(3)) : a.startsWith('lang:') ? A.setLang(a.slice(5)) : A[a]() };
     const closeM = () => { document.querySelectorAll('.menu').forEach(m => m.classList.remove('open')); document.querySelectorAll('.so').forEach(m => m.classList.remove('so')) };
@@ -2280,25 +2457,747 @@ Grille pixel par pixel : zoomez à 600 % ou plus.|Cuadrícula píxel a píxel: a
     for (const k in M) { const m = E('span', { className: 'menu' }, E('span', { textContent: k }), mk(M[k])); m.onclick = ev => { const o = m.classList.contains('open'); closeM(); if (!o) m.classList.add('open'); ev.stopPropagation() }; m.onmouseenter = () => { if (document.querySelector('.menu.open') && !m.classList.contains('open')) { closeM(); m.classList.add('open') } }; $('mb').append(m) }
     addEventListener('click', closeM);
     [['📄', 'new', 'Nouveau'], ['📂', 'open', 'Ouvrir'], ['💾', 'save', 'Enregistrer'], '|', ['✂️', 'cut', 'Couper'], ['📋', 'copy', 'Copier'], ['📥', 'paste', 'Coller'], ['⛶', 'crop', 'Rogner'], ['⊘', 'desel', 'Désélectionner'], '|', ['↶', 'undo', 'Annuler'], ['↷', 'redo', 'Rétablir'], '|', ['#', 'grid', 'Grille'], ['pp', 'pp', 'Pixel perfect']].forEach(i => $('ic').append(i === '|' ? E('span', { className: 's' }) : E('button', { innerHTML: svg(i[1]), title: i[2], __a: i[1], onclick: () => run(i[1]) })));
-    const KEYS = { z: 'undo', 'S+z': 'redo', y: 'redo', e: 'merge', n: 'new', o: 'open', s: 'save', 'S+s': 'saveAs', c: 'copy', x: 'cut', v: 'paste', a: 'all', 'S+a': 'z100', d: 'desel', 'S+x': 'crop', r: 'resize', 'S+n': 'add', 'S+d': 'dup', m: 'merge', 'S+i': 'fx:inv', 'S+g': 'fx:bw', 'S+e': 'fx:sepia', 'S+u': 'fx:hs', '+': 'zin', '=': 'zin', '-': 'zout', '0': 'fit', '1': 'z100' };
+    const KEYS = { z: 'undo', 'S+z': 'redo', y: 'redo', e: 'merge', n: 'new', o: 'open', s: 'save', 'S+s': 'saveAs', c: 'copy', x: 'cut', v: 'paste', a: 'all', 'S+a': 'z100', d: 'desel', 'S+x': 'crop', r: 'resize', 'S+n': 'add', 'S+r': 'canvas', 'S+d': 'dup', m: 'merge', 'S+i': 'fx:inv', 'S+g': 'fx:bw', 'S+e': 'fx:sepia', 'S+u': 'fx:hs', '+': 'zin', '=': 'zin', '-': 'zout', '0': 'fit', '1': 'z100' };
     addEventListener('keyup', e => { if (e.key === ' ') space = false });
     var bcEl, bcT = 0, bmx = 0, bmy = 0, bOver = 0;
-    function bcShow(x, y) { if (!bcEl) { bcEl = E('div', { id: 'bcur' }); document.body.append(bcEl) } if (!D || !['brush', 'erase', 'pencil'].includes(tool)) { bcEl.style.display = 'none'; return } const d = Math.max(2, (tool === 'pencil' ? 1 : BW()) * D.zoom); Object.assign(bcEl.style, { display: 'block', width: d + 'px', height: d + 'px', left: x + 'px', top: y + 'px' }) }
+    function bcShow(x, y) { if (!bcEl) { bcEl = E('div', { id: 'bcur' }); document.body.append(bcEl) } if (!D || !BRT.includes(tool)) { bcEl.style.display = 'none'; return } const d = Math.max(2, (tool === 'pencil' ? 1 : BW()) * D.zoom); Object.assign(bcEl.style, { display: 'block', width: d + 'px', height: d + 'px', left: x + 'px', top: y + 'px' }) }
     function bcUpd() { if (bOver) bcShow(bmx, bmy); else if (bcEl) bcEl.style.display = 'none' }
-    $('scroll').addEventListener('pointermove', e => { if (e.pointerType === 'touch') { bOver = 0; bcUpd(); return } bmx = e.clientX; bmy = e.clientY; bOver = e.target === cv; clearTimeout(bcT); bcUpd() });
-    $('scroll').addEventListener('mouseleave', () => { bOver = 0; bcUpd() });
+    $('scroll').addEventListener('pointermove', e => { if (e.pointerType === 'touch') { bOver = 0; bcUpd(); return } bmx = e.clientX; bmy = e.clientY; bOver = e.target === cv; clearTimeout(bcT); bcUpd(); pkUpd() });
+    $('scroll').addEventListener('mouseleave', () => { bOver = 0; bcUpd(); pkUpd() });
     $('bw').addEventListener('input', () => { const s = $('scroll'), r = s.getBoundingClientRect(); bcShow(r.left + s.clientWidth / 2, r.top + s.clientHeight / 2); clearTimeout(bcT); bcT = setTimeout(bcUpd, 1200) });
     let midT = 0;['mousedown', 'mouseup', 'auxclick'].forEach(t => addEventListener(t, e => { if (e.button === 1) { midT = Date.now(); e.preventDefault() } }, true));
     addEventListener('paste', e => { if (Date.now() - midT < 1000) { e.preventDefault(); return } if (!D || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return; e.preventDefault(); const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => x.type.startsWith('image/')); f ? pasteBlob(f) : pasteInternal() });
     addEventListener('keydown', e => {
-      if (!D || ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return; const k = e.key.toLowerCase(); if (k === ' ') { space = true; e.preventDefault(); return } if (e.ctrlKey || e.metaKey) { const m = KEYS[(e.shiftKey && /^[a-z]$/.test(k) ? 'S+' : '') + k]; if (m && m !== 'paste') { e.preventDefault(); run(m) } return } if (e.key === 'F4') { e.preventDefault(); return run('props') }
+      if (!D || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' && !/^(range|checkbox|radio|button|color|file)$/.test(e.target.type)) return; const k = e.key.toLowerCase(); if (k === ' ') { space = true; e.preventDefault(); return } if (e.ctrlKey || e.metaKey) { const m = KEYS[(e.shiftKey && /^[a-z]$/.test(k) ? 'S+' : '') + k]; if (m && m !== 'paste') { e.preventDefault(); run(m) } return } if (e.key === 'F4') { e.preventDefault(); return run('props') }
 
-      if (e.key === 'Enter' && fl) return commitFl(); if (e.key === 'Delete') return run('erase'); if (e.key === 'Backspace' && D.sel) { e.preventDefault(); return run('fillsel') } if (e.key === 'Enter' && D.sel) return run('fillsel'); if (k === 'm') return setTool(tool === 'movepx' ? 'movesel' : 'movepx');
+      if (pl) { if (e.key === 'Enter') { e.preventDefault(); return plEnd(true) } if (e.key === 'Escape') return plEnd(false); if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pl.pts.pop(); if (pl.pts.length) plDraw(); else plEnd(false); return } } if (e.key === 'Enter' && fl) return commitFl(); if (e.key === 'Delete') return run('erase'); if (e.key === 'Backspace' && D.sel) { e.preventDefault(); return run('fillalpha') } if (e.key === 'Enter' && D.sel) return run('fillsel'); if (k === 'm') return setTool(tool === 'movepx' ? 'movesel' : 'movepx');
       const t = { s: 'rs', q: 'lasso', c: 'es', w: 'wand', z: 'zoom', h: 'pan', f: 'fill', g: 'grad', b: 'brush', e: 'erase', p: 'pencil', k: 'pick', t: 'text', l: 'line', o: 'shape' }[k]; if (t) setTool(t)
     });
     $('tog').append(E('button', { innerHTML: svg('lang'), title: 'Langue / Language', onclick: () => A.lang() }));
-    window.Kollage = { version: '1.3.1', A, KRA, lzfC, lzfD, FX, T, run, setCol, render: renderNow, KOL, PDN, encode, openFile, mkProject, get doc() { return D } };
-    A.ext = () => alert(tr('Les extensions ne sont pas disponibles pour le moment.'));
+    // ======================= 1.4.0 =======================
+    // ---------- Polyline
+    var pl = null;
+    function plDraw(ex) {
+      if (!pl || pl.doc !== D) return; X().putImageData(pl.base, 0, 0);
+      const pts = ex ? [...pl.pts, ex] : pl.pts, m = $('fill').value, closed = m !== 'o' && pts.length > 2;
+      const path = c => { c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)); if (closed) c.closePath() };
+      paint(x => {
+        if (PP) {
+          const lw = Math.max(1, Math.round(+$('bw').value)), pass = (kind, col, al) => { const t = cvs(D.w, D.h), c = t.getContext('2d'); c.lineWidth = lw; c.lineJoin = c.lineCap = 'round'; c.fillStyle = c.strokeStyle = '#000'; path(c); kind === 'f' ? c.fill() : c.stroke(); thr(t, col, al); x.drawImage(t, 0, 0) };
+          if (closed) pass('f', m === 'b' ? pl.col2 : pl.col, m === 'b' ? pl.a2 : pl.a); if (!closed || m !== 'f') pass('s', pl.col, pl.a)
+        } else {
+          x.lineWidth = +$('bw').value; x.lineJoin = x.lineCap = 'round'; x.strokeStyle = rgba(pl.col, pl.a); x.fillStyle = m === 'b' ? rgba(pl.col2, pl.a2) : rgba(pl.col, pl.a); path(x);
+          if (closed) x.fill(); if (!closed || m !== 'f') x.stroke()
+        }
+      })
+    }
+    function plEnd(ok) {
+      if (!pl) return; const q = pl;
+      if (q.doc !== D) { pl = null; return }
+      if (ok && q.pts.length > 1) { plDraw(); pl = null; push('Polyligne') } else { X().putImageData(q.base, 0, 0); pl = null; render() }
+    }
+    function plDown(e) {
+      const p = P(e), rb = e.button === 2;
+      if (rb && pl) { plEnd(true); return }
+      if (pl && pl.doc !== D) pl = null;
+      if (!pl) pl = { doc: D, base: X().getImageData(0, 0, D.w, D.h), pts: [], col: rb ? c2 : c1, col2: rb ? c1 : c2, a: rb ? al2 : al1, a2: rb ? al1 : al2 };
+      const lp = pl.pts[pl.pts.length - 1]; if (!lp || Math.hypot(lp.x - p.x, lp.y - p.y) > .5) pl.pts.push(p);
+      plDraw()
+    }
+    cv.addEventListener('dblclick', () => { if (pl && tool === 'polyline') plEnd(true) });
+
+    // ---------- Eyedropper for colour parameters (reads the original image, not the live preview)
+    var dlgPick = null, fxBaseData = null;
+    function pickCol(x, y) {
+      if (dlgPick && fxBaseData && fxBaseData.width === D.w && fxBaseData.height === D.h) { const k = (y * D.w + x) * 4, d = fxBaseData.data; return [d[k], d[k + 1], d[k + 2], d[k + 3]] }
+      return [...($('pimg').checked ? cx : X()).getImageData(x, y, 1, 1).data]
+    }
+    function pickStart(btn, set) { pickStop(); dlgPick = { btn, set }; btn.style.background = '#9fd0f5'; cv.style.cursor = 'crosshair'; say(tr('Cliquez sur l’image pour choisir la couleur (Échap : annuler).')) }
+    function pickStop() { if (!dlgPick) return; dlgPick.btn.style.background = ''; dlgPick = null; cv.style.cursor = ''; pkUpd() }
+    addEventListener('pointerdown', e => {
+      if (!dlgPick || !D) return; if (e.target !== cv) return; e.stopPropagation(); e.preventDefault();
+      const p = P(e), x = Math.floor(p.x), y = Math.floor(p.y); if (x < 0 || y < 0 || x >= D.w || y >= D.h) return;
+      const c = pickCol(x, y); if (c[3] === 0) { say(tr('Pixel transparent : choisissez un pixel coloré.')); return } const set = dlgPick.set; pickStop(); set(hx(c))
+    }, true);
+    addEventListener('keydown', e => { if (dlgPick && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); pickStop() } }, true);
+
+    // ---------- Colour swatch next to the cursor for the eyedropper
+    var pkEl;
+    function pkUpd() {
+      if (!pkEl) { pkEl = E('div', { id: 'pksw' }); document.body.append(pkEl) }
+      if (!D || (tool !== 'pick' && !dlgPick) || !bOver) { pkEl.style.display = 'none'; return }
+      const r = cv.getBoundingClientRect(), x = Math.floor((bmx - r.left) / D.zoom), y = Math.floor((bmy - r.top) / D.zoom);
+      if (x < 0 || y < 0 || x >= D.w || y >= D.h) { pkEl.style.display = 'none'; return }
+      const d = pickCol(x, y), c = `rgba(${d[0]},${d[1]},${d[2]},${d[3] / 255})`;
+      pkEl.style.cssText = `display:block;left:${bmx + 16}px;top:${bmy + 16}px;background-image:linear-gradient(${c},${c}),repeating-conic-gradient(#bbb 0 25%,#fff 0 50%);background-size:auto,8px 8px`
+    }
+
+    // ---------- Finger (smudge) tool
+    function fingerDab(a, b) {
+      const st = +$('fst').value / 100; if (!drag.fr) drag.fr = Math.max(1, BW() / 2); const r = drag.fr, d = Math.ceil(r * 2) + 2;
+      const grab = (px, py) => { const t = cvs(d, d); t.getContext('2d').drawImage(L().c, -Math.round(px - d / 2), -Math.round(py - d / 2)); return t };
+      const soft = t => { const c = t.getContext('2d'); c.globalCompositeOperation = 'destination-in'; const g = c.createRadialGradient(d / 2, d / 2, 0, d / 2, d / 2, d / 2); g.addColorStop(0, '#000'); g.addColorStop(.55, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, d, d); return t };
+      if (!drag.fb) { drag.fb = grab(a.x, a.y); return }
+      const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, r * .3)));
+      paint(x => { for (let i = 1; i <= n; i++) { const px = a.x + (b.x - a.x) * i / n, py = a.y + (b.y - a.y) * i / n, t = cvs(d, d); t.getContext('2d').drawImage(drag.fb, 0, 0); x.globalAlpha = st; x.globalCompositeOperation = 'source-over'; x.drawImage(soft(t), Math.round(px - d / 2), Math.round(py - d / 2)); x.globalAlpha = 1; drag.fb = grab(px, py) } })
+    }
+    $('fst').oninput = e => $('fsv').textContent = e.target.value + '%';
+    $('spd').checked = matchMedia('(pointer:coarse)').matches;
+
+    // ---------- Graphics tablet: the first time a pen is seen, switch the brush type to "size follows pressure".
+    // It only happens once per session, so the user can still pick another brush afterwards.
+    var penAuto = false;
+    const penSeen = e => { if (penAuto || e.pointerType !== 'pen') return; penAuto = true; if ($('bt').value === 'b') { $('bt').value = 'p'; say(tr('Tablette graphique détectée : pinceau « taille selon la pression » activé.')) } };
+    addEventListener('pointerover', penSeen, true); addEventListener('pointerdown', penSeen, true);
+
+    // ---------- Pencil brush grain
+    const pgr = rng(7);
+    function pencilGrain(x, px, py, r, col, a) {
+      x.fillStyle = rgba(col, a * .55); x.beginPath(); x.arc(px, py, r * .8, 0, 7); x.fill(); x.fillStyle = rgba(col, a);
+      const n = Math.ceil(r * 1.5) + 2; for (let i = 0; i < n; i++) { const ang = pgr() * 6.283, d = Math.sqrt(pgr()) * r; x.fillRect(Math.round(px + Math.cos(ang) * d), Math.round(py + Math.sin(ang) * d), 1, 1) }
+    }
+
+    // ---------- Selection: subtract / inverse
+    function maskFromCanvas(t) {
+      const W = t.width, H = t.height, d = t.getContext('2d').getImageData(0, 0, W, H).data, pa = new Path2D(); let x0 = 1e9, y0 = 1e9, x1 = 0, y1 = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] >= 128) { let e = x; while (e < W && d[(y * W + e) * 4 + 3] >= 128) e++; pa.rect(x, y, e - x, 1); x0 = Math.min(x0, x); x1 = Math.max(x1, e); y0 = Math.min(y0, y); y1 = y; x = e }
+      return x1 ? { p: pa, b: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 + 1 } } : null
+    }
+    function selBool(a, b) {
+      const t = cvs(D.w, D.h), c = t.getContext('2d'); c.fillStyle = '#000'; if (a) c.fill(a.p); else c.fillRect(0, 0, D.w, D.h);
+      c.globalCompositeOperation = 'destination-out'; c.fill(b.p); const q = maskFromCanvas(t); return q ? { p: q.p, k: 'wand', b: q.b } : null
+    }
+
+    // ---------- Give the keyboard back to the canvas after using a control
+    addEventListener('change', e => { if (e.target.tagName === 'SELECT') e.target.blur() }, true);
+    cv.addEventListener('pointerdown', () => { const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur() }, true);
+
+    // ---------- Fill including alpha (Backspace)
+    A.fillalpha = () => {
+      // Same mechanism as "Fill selection" (clipped by the selection), but RGB + alpha replace the pixels instead of blending with them.
+      paint(x => { x.globalCompositeOperation = 'destination-out'; x.fillStyle = '#000'; x.fillRect(0, 0, D.w, D.h); x.globalCompositeOperation = 'source-over'; x.fillStyle = rgba(c1, al1); x.fillRect(0, 0, D.w, D.h) });
+      push('Remplir la sélection (remplace l’alpha)')
+    };
+
+    // ---------- Modal helper (same window as the confirmation dialogs)
+    function modal(title, nodes, wide) {
+      if (wOpen) return null; wOpen = 1; const w = $('wdlg'), b = $('wdlgb');
+      const close = () => { w.style.display = 'none'; wOpen = 0; b.style.width = b.style.maxHeight = b.style.overflow = ''; b.ondrop = b.ondragover = b.onpaste = null; b.onkeydown = null; removeEventListener('keydown', kd, true) };
+      const kd = e => { if (e.key === 'Escape') { e.preventDefault(); close(); return } if (!b.contains(e.target)) e.stopImmediatePropagation() };
+      b.innerHTML = ''; b.style.left = b.style.top = ''; b.style.transform = ''; b.onkeydown = e => e.stopPropagation(); if (wide) { b.style.width = 'min(' + wide + 'px, calc(100vw - 24px))'; b.style.top = '3%'; b.style.maxHeight = 'calc(100vh - 40px)'; b.style.overflow = 'auto' } const tt = E('b', { textContent: tr(title), style: 'cursor:move;user-select:none;touch-action:none;display:block;margin:-12px -12px 4px;padding:8px 12px;background:#dfe6ee;border-bottom:1px solid #c5c5c5' });
+      tt.onpointerdown = e => {
+        if (e.button) return; e.preventDefault(); const r = b.getBoundingClientRect(), pr = b.offsetParent.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+        b.style.transform = 'none'; b.style.left = r.left - pr.left + 'px'; b.style.top = r.top - pr.top + 'px'; tt.setPointerCapture(e.pointerId);
+        tt.onpointermove = m => { const x = Math.min(innerWidth - 60, Math.max(60 - r.width, m.clientX - ox)), y = Math.min(innerHeight - 30, Math.max(0, m.clientY - oy)); b.style.left = x - pr.left + 'px'; b.style.top = y - pr.top + 'px' };
+        tt.onpointerup = tt.onpointercancel = () => { tt.onpointermove = null }
+      };
+      b.append(tt, ...nodes); w.style.display = 'block'; addEventListener('keydown', kd, true); return close
+    }
+    const mrow = (...n) => E('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, ...n);
+    const mbtn = (t, f) => E('button', { textContent: tr(t), onclick: f });
+
+    // ---------- Canvas size (Paint.NET style)
+    A.canvas = () => {
+      let an = [1, 1], close; const ar = D.w / D.h;
+      const mode = E('select', {}, E('option', { value: 'p', textContent: tr('En pourcentage') }), E('option', { value: 'a', textContent: tr('Taille absolue') })); mode.value = 'a';
+      const pc = E('input', { type: 'number', min: 1, max: 1000, value: 100, style: 'width:70px' }), nw = E('input', { type: 'number', min: 1, max: 16000, value: D.w, style: 'width:80px' }), nh = E('input', { type: 'number', min: 1, max: 16000, value: D.h, style: 'width:80px' }), keep = E('input', { type: 'checkbox', checked: true });
+      const info = E('div', { style: 'font-size:11px;opacity:.8' }), upd = () => { info.textContent = tr('Taille actuelle : ') + D.w + ' × ' + D.h + ' px' }; upd();
+      const mod = () => { const p = mode.value === 'p'; pc.disabled = !p; nw.disabled = nh.disabled = p; keep.disabled = p };
+      pc.oninput = () => { nw.value = Math.max(1, Math.round(D.w * pc.value / 100)); nh.value = Math.max(1, Math.round(D.h * pc.value / 100)) };
+      nw.oninput = () => { if (keep.checked) nh.value = Math.max(1, Math.round(nw.value / ar)); pc.value = Math.round(nw.value / D.w * 100) };
+      nh.oninput = () => { if (keep.checked) nw.value = Math.max(1, Math.round(nh.value * ar)); pc.value = Math.round(nh.value / D.h * 100) };
+      mode.onchange = mod; mod();
+      const grid = E('div', { style: 'display:grid;grid-template-columns:repeat(3,28px);gap:2px' }), bs = [];
+      ['↖', '↑', '↗', '←', '●', '→', '↙', '↓', '↘'].forEach((t, i) => { const bt = E('button', { textContent: t, style: 'width:28px;height:28px;padding:0', onclick: () => { an = [i % 3, (i / 3) | 0]; bs.forEach((q, j) => q.style.background = j === i ? '#9fd0f5' : '') } }); bs.push(bt); grid.append(bt) }); bs[4].style.background = '#9fd0f5';
+      const ok = () => {
+        const W = Math.max(1, Math.min(16000, +nw.value | 0)), H = Math.max(1, Math.min(16000, +nh.value | 0)), ox = Math.round([0, (W - D.w) / 2, W - D.w][an[0]]), oy = Math.round([0, (H - D.h) / 2, H - D.h][an[1]]);
+        close(); xform(W, H, (x, s) => x.drawImage(s, ox, oy)); push('Taille de la zone de dessin')
+      };
+      close = modal('Taille de la zone de dessin', [info, mrow(E('span', { textContent: tr('Redimensionner :') }), mode), mrow(E('span', { textContent: tr('Pourcentage :') }), pc, E('span', { textContent: '%' })), mrow(E('span', { textContent: tr('Largeur') }), nw, E('span', { textContent: tr('Hauteur') }), nh, E('span', { textContent: 'px' })), E('label', {}, keep, E('span', { textContent: ' ' + tr('Conserver les proportions') })), mrow(E('span', { textContent: tr('Ancrage :') }), grid), mrow(mbtn('OK', ok), mbtn(CAN(), () => close()))])
+    };
+
+    // ---------- New image: the size can come from the last copy made in the app, from the system clipboard (button),
+    // or from an image pasted with Ctrl+V inside the dialog (works with images copied from a website, no permission needed).
+    A.new = async () => {
+      let w = 800, h = 600, close;
+      if (clip && clipFresh) { w = clip.c.width; h = clip.c.height }
+      else if (!clipUsed) { try { if (navigator.permissions && (await navigator.permissions.query({ name: 'clipboard-read' })).state === 'granted') for (const it of await navigator.clipboard.read()) { const ty = it.types.find(x => x.startsWith('image/')); if (ty) { const bm = await createImageBitmap(await it.getType(ty)); w = bm.width; h = bm.height; break } } } catch (e) { } }
+      const nw = E('input', { type: 'number', min: 1, max: 8000, value: Math.min(8000, w), style: 'width:90px' }), nh = E('input', { type: 'number', min: 1, max: 8000, value: Math.min(8000, h), style: 'width:90px' });
+      const fromBlob = async blob => { const bm = await createImageBitmap(blob); nw.value = Math.min(8000, bm.width); nh.value = Math.min(8000, bm.height); say(tr('Taille reprise du presse-papiers : ') + bm.width + ' × ' + bm.height) };
+      const bClip = mbtn('Taille du presse-papiers', async () => {
+        try { for (const it of await navigator.clipboard.read()) { const ty = it.types.find(x => x.startsWith('image/')); if (ty) { await fromBlob(await it.getType(ty)); return } } say(tr('Aucune image dans le presse-papiers.')) }
+        catch (e) { say(tr('Presse-papiers inaccessible : utilisez Ctrl+V dans cette fenêtre.')) }
+      });
+      const ok = () => { close(); mkDoc(Math.max(1, Math.min(8000, nw.value | 0)), Math.max(1, Math.min(8000, nh.value | 0)), 'Sans titre') };
+      [nw, nh].forEach(i => i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok() } });
+      close = modal('Nouvelle image', [mrow(E('span', { textContent: tr('Largeur') }), nw, E('span', { textContent: tr('Hauteur') }), nh, E('span', { textContent: 'px' })), mrow(bClip), E('div', { textContent: tr('Astuce : Ctrl+V dans cette fenêtre reprend la taille d’une image copiée (même depuis un site web).'), style: 'font-size:11px;opacity:.8;max-width:340px' }), mrow(mbtn('OK', ok), mbtn(CAN(), () => close()))]);
+      if (!close) return;
+      // paste events are not covered by the global handler while this dialog has the focus: take the size of the pasted image
+      $('wdlgb').onpaste = async e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => x.type.startsWith('image/')); if (f) { e.preventDefault(); e.stopPropagation(); await fromBlob(f) } };
+      nw.focus(); nw.select()
+    };
+
+    // ---------- Resize image (percentage or absolute size)
+    A.resize = () => {
+      const ar = D.w / D.h; let close;
+      const mode = E('select', {}, E('option', { value: 'p', textContent: tr('En pourcentage') }), E('option', { value: 'a', textContent: tr('Taille absolue') })); mode.value = 'a';
+      const pc = E('input', { type: 'number', min: 1, max: 1000, value: 100, style: 'width:70px' }), nw = E('input', { type: 'number', min: 1, max: 16000, value: D.w, style: 'width:80px' }), nh = E('input', { type: 'number', min: 1, max: 16000, value: D.h, style: 'width:80px' }), keep = E('input', { type: 'checkbox', checked: true }), info = E('div', { style: 'font-size:11px;opacity:.8' });
+      const calc = () => mode.value === 'p' ? [Math.max(1, Math.round(D.w * pc.value / 100)), Math.max(1, Math.round(D.h * pc.value / 100))] : [Math.max(1, nw.value | 0), Math.max(1, nh.value | 0)];
+      const upd = () => { const [w, h] = calc(); info.textContent = tr('Taille actuelle : ') + D.w + ' × ' + D.h + ' px  →  ' + w + ' × ' + h + ' px' };
+      const mod = () => { const p = mode.value === 'p'; pc.disabled = !p; nw.disabled = nh.disabled = keep.disabled = p; upd() };
+      pc.oninput = () => { nw.value = Math.max(1, Math.round(D.w * pc.value / 100)); nh.value = Math.max(1, Math.round(D.h * pc.value / 100)); upd() };
+      nw.oninput = () => { if (keep.checked) nh.value = Math.max(1, Math.round(nw.value / ar)); pc.value = Math.round(nw.value / D.w * 100); upd() };
+      nh.oninput = () => { if (keep.checked) nw.value = Math.max(1, Math.round(nh.value * ar)); pc.value = Math.round(nh.value / D.h * 100); upd() };
+      mode.onchange = mod;
+      const ok = () => {
+        const [w, h] = calc(); if (w > 16000 || h > 16000 || w * h > 8e7) { say(tr('Taille trop grande.')); return }
+        close(); xform(w, h, (x, s) => x.drawImage(s, 0, 0, w, h)); push('Redimensionner')
+      };
+      [pc, nw, nh].forEach(i => i.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok() } });
+      close = modal('Redimensionner', [info, mrow(E('span', { textContent: tr('Redimensionner :') }), mode), mrow(E('span', { textContent: tr('Pourcentage :') }), pc, E('span', { textContent: '%' })), mrow(E('span', { textContent: tr('Largeur') }), nw, E('span', { textContent: tr('Hauteur') }), nh, E('span', { textContent: 'px' })), E('label', {}, keep, E('span', { textContent: ' ' + tr('Conserver les proportions') })), mrow(mbtn('OK', ok), mbtn(CAN(), () => close()))]);
+      mod()
+    };
+
+    // ---------- Palettes
+    const PALB = {
+      'Game Boy (DMG)': { c: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'] }, 'Game Boy Pocket': { c: ['#000000', '#555555', '#aaaaaa', '#ffffff'] }, 'Black and white': { c: ['#000000', '#ffffff'] },
+      'Niveaux de gris (8)': { c: [0, 1, 2, 3, 4, 5, 6, 7].map(i => hx([Math.round(i * 255 / 7), Math.round(i * 255 / 7), Math.round(i * 255 / 7)])) },
+      'Couleurs 15 bits (GBC / GBA / NDS)': { q: 5 },
+      'PICO-8': { c: ['#000000', '#1d2b53', '#7e2553', '#008751', '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8', '#ff004d', '#ffa300', '#ffec27', '#00e436', '#29adff', '#83769c', '#ff77a8', '#ffccaa'] },
+      'CGA (palette 1)': { c: ['#000000', '#55ffff', '#ff55ff', '#ffffff'] }
+    };
+    const DEFPAL = ['#000000', '#404040', '#ff0000', '#ff6a00', '#ffd800', '#b6ff00', '#4cff00', '#00ff21', '#00ff90', '#00ffff', '#0094ff', '#0026ff', '#4800ff', '#b200ff', '#ffffff', '#808080', '#7f0000', '#7f3300', '#7f6a00', '#5b7f00', '#267f00', '#007f0e', '#007f46', '#007f7f', '#004a7f', '#00137f', '#21007f', '#57007f'];
+    let PALU = {}, palAct = null; try { PALU = JSON.parse(localStorage.getItem('kl-pals') || '{}') } catch (e) { }
+    const palSave = () => { try { localStorage.setItem('kl-pals', JSON.stringify(PALU)) } catch (e) { } };
+    const palAll = () => { const o = { ...PALB }; for (const k in PALU) o[k] = { c: PALU[k], u: 1 }; return o };
+    const palSw = l => { $('pal').innerHTML = ''; l.forEach(c => $('pal').append(E('b', { onmousedown: e => { e.preventDefault(); setCol(which(e), c) }, oncontextmenu: e => e.preventDefault(), style: 'background:' + c }))) };
+    function palSnap(c) {
+      const P = palAct && palAll()[palAct]; if (!P || !/^#[0-9a-f]{6}$/i.test(c)) return c; const q = rgb(c);
+      if (P.q) { const m = (1 << P.q) - 1; return hx(q.map(v => Math.round(Math.round(v * m / 255) * 255 / m))) }
+      if (!P.c.length) return c; let best = c, bd = 1e9; for (const h of P.c) { const r = rgb(h), dd = 2 * (q[0] - r[0]) ** 2 + 4 * (q[1] - r[1]) ** 2 + 3 * (q[2] - r[2]) ** 2; if (dd < bd) { bd = dd; best = h } } return best
+    }
+    function palApply(P) {
+      const im = X().getImageData(0, 0, D.w, D.h), d = im.data;
+      if (P.q) { const m = (1 << P.q) - 1; for (let k = 0; k < d.length; k += 4) for (let j = 0; j < 3; j++) d[k + j] = Math.round(Math.round(d[k + j] * m / 255) * 255 / m) }
+      else if (P.c.length) {
+        const C = P.c.map(h => rgb(h)), cache = new Map();
+        for (let k = 0; k < d.length; k += 4) { if (!d[k + 3]) continue; const key = d[k] << 16 | d[k + 1] << 8 | d[k + 2]; let o = cache.get(key); if (o === undefined) { let bd = 1e9; o = 0; for (let i = 0; i < C.length; i++) { const dr = d[k] - C[i][0], dg = d[k + 1] - C[i][1], db = d[k + 2] - C[i][2], dd = 2 * dr * dr + 4 * dg * dg + 3 * db * db; if (dd < bd) { bd = dd; o = i } } cache.set(key, o) } d[k] = C[o][0]; d[k + 1] = C[o][1]; d[k + 2] = C[o][2] }
+      }
+      commitData(im)
+    }
+    function palFromData(im) { const d = im.data, m = new Map(); for (let k = 0; k < d.length; k += 4) { if (d[k + 3] < 8) continue; const key = d[k] << 16 | d[k + 1] << 8 | d[k + 2]; m.set(key, (m.get(key) || 0) + 1) } return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 256).map(([k]) => hx([k >> 16 & 255, k >> 8 & 255, k & 255])) }
+    async function palParse(f) {
+      const e = EXT(f.name); if (/^(png|gif|webp|bmp|jpe?g)$/.test(e)) { const bm = await createImageBitmap(f), c = cvs(bm.width, bm.height), x = c.getContext('2d'); x.drawImage(bm, 0, 0); return palFromData(x.getImageData(0, 0, c.width, c.height)) }
+      const out = []; for (const ln of (await f.text()).split(/\r?\n/)) { let m = ln.match(/^\s*#?([0-9a-fA-F]{6})\s*$/); if (m) { const h = '#' + m[1].toLowerCase(); if (!out.includes(h)) out.push(h); continue } m = ln.match(/^\s*(\d{1,3})\s+(\d{1,3})\s+(\d{1,3})(\s|$)/); if (m) { const h = hx([+m[1], +m[2], +m[3]]); if (!out.includes(h)) out.push(h) } } return out
+    }
+    function openPal() {
+      let cur = palAct && palAll()[palAct] ? palAct : Object.keys(palAll())[0], selC = -1, close;
+      const sbox = 'border:1px solid #828790;background:#fff;color:#000;', list = E('div', { style: sbox + 'height:238px;overflow:auto' }), grid = E('div', { style: sbox + 'display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;padding:6px;height:206px;overflow:auto' });
+      const info = E('div', { style: 'font-size:11px;opacity:.85;min-height:15px' }), nm = E('input', { type: 'text', placeholder: tr('Nom de la nouvelle palette'), style: 'width:100%;box-sizing:border-box' }), fmt = E('select', {}, ...['GIMP (.gpl)', 'Hex (.hex)', 'JASC (.pal)'].map(t => E('option', { textContent: t })));
+      const grp = (t, ...n) => E('fieldset', { style: 'border:1px solid #c5c5c5;margin:0;padding:6px 8px 8px;display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 0' }, E('legend', { textContent: tr(t), style: 'padding:0 4px' }), ...n);
+      const P = () => palAll()[cur];
+      const drawGrid = () => {
+        const p = P(); grid.innerHTML = ''; if (!p) return;
+        if (p.q) { grid.append(E('span', { textContent: tr('32 niveaux par canal (15 bits) : chaque couleur est arrondie.'), style: 'padding:4px' })); info.textContent = tr('Palette intégrée'); return }
+        p.c.forEach((c, i) => grid.append(E('i', { title: c + ' — ' + tr('double-clic : couleur principale'), style: 'width:22px;height:22px;box-sizing:border-box;display:block;border:1px solid #666;background:' + c + (i === selC ? ';outline:2px solid #0078d7;outline-offset:1px' : ''), onclick: () => { selC = i; drawGrid() }, ondblclick: () => setCol(1, c) })));
+        info.textContent = p.c.length + ' ' + tr('couleurs') + ' — ' + tr(p.u ? 'Palette personnelle' : 'Palette intégrée') + (palAct === cur ? ' — ' + tr('active') : '')
+      };
+      const drawList = () => {
+        list.innerHTML = ''; const all = palAll();
+        Object.keys(all).forEach(k => { const p = all[k], on = k === cur; list.append(E('div', { style: 'display:flex;align-items:center;gap:6px;padding:4px 8px;cursor:default;border:1px solid ' + (on ? '#99d1ff;background:#cce8ff' : 'transparent'), onclick: () => { cur = k; selC = -1; drawList(); drawGrid() } }, E('span', { textContent: palAct === k ? '✔' : '', style: 'width:12px;color:#0a7' }), E('span', { textContent: k, style: 'flex:1' }), E('span', { style: 'display:flex' }, ...(p.c || []).slice(0, 6).map(c => E('i', { style: 'width:8px;height:12px;display:block;background:' + c }))))) })
+      };
+      const refresh = () => { drawList(); drawGrid() };
+      const newName = () => { const n = nm.value.trim(); if (!n) { say(tr('Saisissez un nom pour la nouvelle palette.')); return null } if (palAll()[n]) { say(tr('Ce nom existe déjà.')); return null } return n };
+      const made = (n, l) => { PALU[n] = l; palSave(); nm.value = ''; cur = n; selC = -1; refresh() };
+      const bApply = mbtn('Appliquer à l’image', () => { const p = P(); if (!p) return; palAct = cur; palApply(p); push('Palette : ' + cur); palSw(p.c && p.c.length ? p.c.slice(0, 128) : DEFPAL); setCol(1, c1); setCol(2, c2); close() }); bApply.style.fontWeight = 'bold'; bApply.style.minWidth = '130px';
+      const bFree = mbtn('Désactiver la palette', () => { palAct = null; palSw(DEFPAL); say(tr('Palette désactivée.')); refresh() });
+      const bEmpty = mbtn('Vide', () => { const n = newName(); if (n) made(n, []) });
+      const bCopy = mbtn('Copie de la sélection', () => { const n = newName(), p = P(); if (!n) return; if (!p || !p.c) { say(tr('Cette palette ne peut pas être copiée.')); return } made(n, [...p.c]) });
+      const bImg = mbtn('Depuis l’image', () => { const n = newName(); if (n) made(n, palFromData(X().getImageData(0, 0, D.w, D.h))) });
+      const bAdd = mbtn('Ajouter la couleur principale', () => { const p = P(); if (!p || !p.u) { say(tr('Les palettes intégrées ne sont pas modifiables : créez-en une nouvelle.')); return } if (!PALU[cur].includes(c1)) PALU[cur].push(c1); palSave(); refresh() });
+      const bRem = mbtn('Retirer la couleur', () => { const p = P(); if (!p || !p.u || selC < 0) return; PALU[cur].splice(selC, 1); selC = -1; palSave(); refresh() });
+      const bDel = mbtn('Supprimer', () => { const p = P(); if (!p || !p.u) { say(tr('Les palettes intégrées ne sont pas modifiables : créez-en une nouvelle.')); return } delete PALU[cur]; if (palAct === cur) { palAct = null; palSw(DEFPAL) } palSave(); cur = Object.keys(palAll())[0]; refresh() });
+      const bImp = mbtn('Importer…', () => { const inp = E('input', { type: 'file', accept: '.gpl,.pal,.hex,.txt,.png,.gif,.webp,.bmp', onchange: async () => { const f = inp.files[0]; if (!f) return; try { const l = await palParse(f); if (!l.length) { say(tr('Aucune couleur trouvée dans ce fichier.')); return } let n = f.name.replace(/\.[^.]+$/, ''), k = 2; const b0 = n; while (palAll()[n]) n = b0 + ' (' + k++ + ')'; made(n, l) } catch (e) { say(tr('Fichier illisible : ') + f.name) } } }); inp.click() });
+      const bExp = mbtn('Exporter', () => {
+        const p = P(); if (!p || !p.c) { say(tr('Cette palette ne peut pas être exportée.')); return } const rg = p.c.map(h => rgb(h)); let t, ext;
+        if (fmt.value.startsWith('GIMP')) { t = 'GIMP Palette\nName: ' + cur + '\nColumns: 8\n#\n' + rg.map((c, i) => String(c[0]).padStart(3) + ' ' + String(c[1]).padStart(3) + ' ' + String(c[2]).padStart(3) + '\tIndex ' + i).join('\n') + '\n'; ext = 'gpl' }
+        else if (fmt.value.startsWith('Hex')) { t = p.c.map(h => h.slice(1)).join('\n') + '\n'; ext = 'hex' } else { t = 'JASC-PAL\n0100\n' + rg.length + '\n' + rg.map(c => c.join(' ')).join('\n') + '\n'; ext = 'pal' }
+        dl(cur.replace(/[^\w \-]/g, '') + '.' + ext, new Blob([t], { type: 'text/plain' }))
+      });
+      refresh();
+      close = modal('Palettes', [E('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:stretch' },
+        E('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1 1 230px;min-width:0' }, grp('Palettes', list, mrow(bImp, bDel), mrow(fmt, bExp))),
+        E('div', { style: 'display:flex;flex-direction:column;gap:10px;flex:1 1 280px;min-width:0' }, grp('Couleurs', grid, info, mrow(bAdd, bRem)), grp('Nouvelle palette', nm, mrow(bEmpty, bCopy, bImg)))),
+      E('div', { style: 'display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid #c5c5c5;padding-top:10px' }, bApply, bFree, mbtn('Fermer', () => close()))], 640)
+    }
+    A.palettes = openPal;
+
+    // ---------- Kodak film looks
+    const KOD = {
+      'Kodak Gold 200': { s: 1.15, c: 1.06, t: [10, 4, -12], l: 8 }, 'Kodak Portra 400': { s: .92, c: .96, t: [5, 2, -3], l: 12 }, 'Kodak Ektar 100': { s: 1.35, c: 1.15, t: [3, 0, -4], l: 0 },
+      'Kodak Ultramax 400': { s: 1.2, c: 1.08, t: [8, 2, -8], l: 4 }, 'Kodachrome 64': { s: 1.25, c: 1.2, t: [10, -2, -6], l: 2 }, 'Kodak Vision3 500T (cinéma)': { s: 1.05, c: 1.08, t: [-8, 0, 12], l: 6 },
+      'Kodak Tri-X 400 (N&B)': { s: 0, c: 1.25, t: [0, 0, 0], l: 8, bw: 1 }
+    };
+
+    // ---------- Content-aware fill (PatchMatch inpainting)
+    function cafill(im, p) {
+      // Content-aware fill (PatchMatch). Bounded memory: the mask is only read inside the selection's bounding box,
+      // every separate area (multi-selection, lasso in several pieces) gets its own working window,
+      // and all arrays are typed and reused between iterations.
+      const W = im.width, H = im.height, D0 = im.data, R = p.r | 0, sb = D.sel.b || { x: 0, y: 0, w: W, h: H };
+      const bx = Math.max(0, Math.floor(sb.x) - 1), by = Math.max(0, Math.floor(sb.y) - 1), bw = Math.min(W, Math.ceil(sb.x + sb.w) + 1) - bx, bh = Math.min(H, Math.ceil(sb.y + sb.h) + 1) - by;
+      if (bw < 1 || bh < 1) return;
+      const BN = bw * bh, mask = new Uint8Array(BN);
+      { const mc = cvs(bw, bh), mx = mc.getContext('2d'); mx.translate(-bx, -by); mx.fillStyle = '#000'; mx.fill(D.sel.p); const md = mx.getImageData(0, 0, bw, bh).data; for (let i = 0; i < BN; i++) mask[i] = md[i * 4 + 3] > 127 ? 1 : 0; mc.width = mc.height = 0 }
+      // connected areas
+      const lab = new Int32Array(BN), comps = []; let nc = 0;
+      { const stack = new Int32Array(BN);
+        for (let s = 0; s < BN; s++) {
+          if (!mask[s] || lab[s]) continue; const id = ++nc; let sp = 0, x0 = bw, y0 = bh, x1 = -1, y1 = -1, cnt = 0; stack[sp++] = s; lab[s] = id;
+          while (sp) { const i = stack[--sp], x = i % bw, y = (i / bw) | 0; cnt++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+            if (x > 0 && mask[i - 1] && !lab[i - 1]) { lab[i - 1] = id; stack[sp++] = i - 1 } if (x < bw - 1 && mask[i + 1] && !lab[i + 1]) { lab[i + 1] = id; stack[sp++] = i + 1 }
+            if (y > 0 && mask[i - bw] && !lab[i - bw]) { lab[i - bw] = id; stack[sp++] = i - bw } if (y < bh - 1 && mask[i + bw] && !lab[i + bw]) { lab[i + bw] = id; stack[sp++] = i + bw } }
+          comps.push({ id, x0: x0 + bx, y0: y0 + by, x1: x1 + bx, y1: y1 + by, cnt })
+        } }
+      const CAP = 1.5e6, MIN = 2 * R + 4, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const c of comps) {
+        let M = p.m | 0; const reg = Mg => { const rx = Math.max(0, c.x0 - Mg), ry = Math.max(0, c.y0 - Mg); return { rx, ry, rw: Math.min(W, c.x1 + Mg + 1) - rx, rh: Math.min(H, c.y1 + Mg + 1) - ry } };
+        let g = reg(M); while (g.rw * g.rh > CAP && M > MIN) { M = Math.max(MIN, (M * .7) | 0); g = reg(M) }
+        const { rx, ry, rw, rh } = g, N = rw * rh; if (rw < 2 * R + 2 || rh < 2 * R + 2) continue;
+        const buf = new Float32Array(N * 3), hole = new Uint8Array(N), blk = new Uint8Array(N), kn = new Uint8Array(N); let nh = 0;
+        for (let y = 0; y < rh; y++) { const gy = y + ry, my = gy - by; for (let x = 0; x < rw; x++) { const i = y * rw + x, k = (gy * W + x + rx) * 4, gx = x + rx - bx; buf[i * 3] = D0[k]; buf[i * 3 + 1] = D0[k + 1]; buf[i * 3 + 2] = D0[k + 2];
+          let l = 0, mk = 0; if (my >= 0 && my < bh && gx >= 0 && gx < bw) { const mi = my * bw + gx; l = lab[mi]; mk = mask[mi] }
+          if (l === c.id && mk) { hole[i] = 1; blk[i] = 1; nh++ } else if (mk) blk[i] = 1; else kn[i] = 1 } }
+        const inR = (x, y) => x >= 0 && y >= 0 && x < rw && y < rh;
+        // 1. diffusion from the borders inwards
+        const inq = new Uint8Array(N); let front = []; for (let i = 0; i < N; i++) if (hole[i]) { const x = i % rw, y = (i / rw) | 0; for (const [a, b] of nb) if (inR(x + a, y + b) && kn[(y + b) * rw + x + a]) { front.push(i); inq[i] = 1; break } }
+        while (front.length) {
+          const set = [], nx = [];
+          for (const i of front) { if (kn[i]) continue; const x = i % rw, y = (i / rw) | 0; let r = 0, gg = 0, b = 0, cc = 0; for (const [a, bb] of nb) if (inR(x + a, y + bb) && kn[(y + bb) * rw + x + a]) { const j = (y + bb) * rw + x + a; r += buf[j * 3]; gg += buf[j * 3 + 1]; b += buf[j * 3 + 2]; cc++ } if (cc) { buf[i * 3] = r / cc; buf[i * 3 + 1] = gg / cc; buf[i * 3 + 2] = b / cc; set.push(i) } }
+          for (const i of set) { kn[i] = 1; const x = i % rw, y = (i / rw) | 0; for (const [a, bb] of nb) { const j = (y + bb) * rw + x + a; if (inR(x + a, y + bb) && hole[j] && !kn[j] && !inq[j]) { inq[j] = 1; nx.push(j) } } }
+          front = nx
+        }
+        // 2. valid sources (whole patch outside masked areas) and targets
+        const S = rw + 1, ps = new Int32Array(S * (rh + 1)); for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) ps[(y + 1) * S + x + 1] = blk[y * rw + x] + ps[y * S + x + 1] + ps[(y + 1) * S + x] - ps[y * S + x];
+        const valid = new Uint8Array(N), st = R >= 3 ? 2 : 1; let nv = 0, nt = 0;
+        for (let y = R; y < rh - R; y++) for (let x = R; x < rw - R; x++) { const q = ps[(y + R + 1) * S + x + R + 1] - ps[(y - R) * S + x + R + 1] - ps[(y + R + 1) * S + x - R] + ps[(y - R) * S + x - R]; if (!q) { valid[y * rw + x] = 1; nv++ } if (hole[y * rw + x] && x % st === 0 && y % st === 0) nt++ }
+        if (nv && nt) {
+          const vl = new Int32Array(nv), T = new Int32Array(nt); let a = 0, b = 0;
+          for (let y = R; y < rh - R; y++) for (let x = R; x < rw - R; x++) { const i = y * rw + x; if (valid[i]) vl[a++] = i; if (hole[i] && x % st === 0 && y % st === 0) T[b++] = i }
+          const rnd = rng(12345 + c.id), nnf = new Int32Array(N).fill(-1), iters = nh > 150000 ? Math.min(p.i, 4) : p.i, acc = new Float32Array(N * 3), cnt = new Float32Array(N);
+          const cost = (t, s, best) => { let sum = 0; for (let dy = -R; dy <= R; dy++) { let a1 = (t + dy * rw - R) * 3, b1 = (s + dy * rw - R) * 3; for (let dx = -R; dx <= R; dx++) { const r = buf[a1] - buf[b1], gg = buf[a1 + 1] - buf[b1 + 1], bl = buf[a1 + 2] - buf[b1 + 2]; sum += r * r + gg * gg + bl * bl; a1 += 3; b1 += 3 } if (sum >= best) return sum } return sum };
+          for (let n = 0; n < nt; n++) nnf[T[n]] = vl[(rnd() * nv) | 0];
+          for (let it = 0; it < iters; it++) {
+            const fw = it % 2 === 0, dd = fw ? -1 : 1;
+            for (let n = 0; n < nt; n++) {
+              const t = T[fw ? n : nt - 1 - n]; let bs = nnf[t], bc = cost(t, bs, 1e18);
+              for (let k = 0; k < 2; k++) { const o = k ? dd * st * rw : dd * st, nn = t + o; if (nn < 0 || nn >= N) continue; const sn = nnf[nn]; if (sn >= 0) { const cd = sn - o; if (cd >= 0 && cd < N && valid[cd]) { const cc = cost(t, cd, bc); if (cc < bc) { bc = cc; bs = cd } } } }
+              for (let rad = Math.min(48, Math.max(rw, rh) >> 1); rad >= 1; rad >>= 1) { const sx = (bs % rw) + (((rnd() * 2 - 1) * rad) | 0), sy = ((bs / rw) | 0) + (((rnd() * 2 - 1) * rad) | 0); if (sx < R || sy < R || sx >= rw - R || sy >= rh - R) continue; const cd = sy * rw + sx; if (!valid[cd]) continue; const cc = cost(t, cd, bc); if (cc < bc) { bc = cc; bs = cd } }
+              nnf[t] = bs
+            }
+            acc.fill(0); cnt.fill(0);
+            for (let n = 0; n < nt; n++) { const t = T[n], s0 = nnf[t]; for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const ti = t + dy * rw + dx; if (!hole[ti]) continue; const si = s0 + dy * rw + dx; acc[ti * 3] += buf[si * 3]; acc[ti * 3 + 1] += buf[si * 3 + 1]; acc[ti * 3 + 2] += buf[si * 3 + 2]; cnt[ti]++ } }
+            for (let i = 0; i < N; i++) if (cnt[i]) { buf[i * 3] = acc[i * 3] / cnt[i]; buf[i * 3 + 1] = acc[i * 3 + 1] / cnt[i]; buf[i * 3 + 2] = acc[i * 3 + 2] / cnt[i] }
+          }
+        }
+        // 3. write back; the filled area becomes "known" for the following areas
+        for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) { const i = y * rw + x; if (!hole[i]) continue; const k = ((y + ry) * W + x + rx) * 4; D0[k] = buf[i * 3]; D0[k + 1] = buf[i * 3 + 1]; D0[k + 2] = buf[i * 3 + 2]; D0[k + 3] = 255; mask[(y + ry - by) * bw + x + rx - bx] = 0 }
+      }
+    }
+
+    // ---------- Decompressor group: deblocking, ringing filter, wavelet denoising, automatic restoration, palette compression
+    // 1. Adaptive deblocking: only pixels around block borders are touched. A border is corrected when its step is small (artificial)
+    //    and not hidden in texture; strong steps are real edges and are left alone. The block grid is detected automatically.
+    function detectGrid(d, W, H, B) {
+      const Y = i => (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8, cx = new Float64Array(W + 1), cy = new Float64Array(H + 1);
+      for (let y = 0; y < H; y += 2) for (let x = 1; x < W; x++) { const i = (y * W + x) * 4; cx[x] += Math.min(16, Math.abs(Y(i) - Y(i - 4))) }
+      for (let y = 1; y < H; y++) for (let x = 0; x < W; x += 2) { const i = (y * W + x) * 4; cy[y] += Math.min(16, Math.abs(Y(i) - Y(i - W * 4))) }
+      // blockiness score per offset: difference across the border minus the average difference of its two neighbouring columns/rows
+      const pick = (c, n) => { const s = new Float64Array(B); for (let x = 2; x < n - 1; x++) s[x % B] += c[x] - (c[x - 1] + c[x + 1]) / 2; let b = 0; for (let o = 1; o < B; o++) if (s[o] > s[b]) b = o; return s[b] > 0 ? b : 0 };
+      return [pick(cx, W), pick(cy, H)]
+    }
+    function deblock(im, p) {
+      const W = im.width, H = im.height, d = im.data, B = Math.max(2, p.b | 0), T = p.t, lam = p.f / 100, nw = Math.max(1, Math.min(3, p.n | 0)), kk = 2.2 - 2 * p.s / 100, WT = [1, .66, .33];
+      const [ox, oy] = p.g === tr('Manuelle') ? [(p.x | 0) % B, (p.y | 0) % B] : detectGrid(d, W, H, B), Y = i => (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+      // i: byte offset of the first pixel after the border, st: byte stride across the border, aL/aR: pixels available on each side
+      const fix = (i, st, aL, aR) => {
+        const a0 = i - st; if (!d[a0 + 3] || !d[i + 3]) return;
+        const ya = Y(a0), yb = Y(i), step = Math.abs(yb - ya); if (!step || step > T) return;
+        const ya1 = Y(i - 2 * st), yb1 = Y(i + st), gl = aL >= 3 ? (Math.abs(ya - ya1) + Math.abs(ya1 - Y(i - 3 * st))) / 2 : Math.abs(ya - ya1), gr = aR >= 3 ? (Math.abs(yb - yb1) + Math.abs(Y(i + 2 * st) - yb1)) / 2 : Math.abs(yb - yb1);
+        if (gl > step * kk || gr > step * kk) return;
+        const n = Math.min(nw, aL, aR);
+        for (let c = 0; c < 3; c++) { const dl = (d[i + c] - d[a0 + c]) * lam; for (let j = 0; j < n; j++) { d[a0 - j * st + c] += dl * WT[j]; d[i + j * st + c] -= dl * WT[j] } }
+      };
+      for (let y = 0; y < H; y++) for (let x = ox < 2 ? ox + B : ox; x <= W - 2; x += B) fix((y * W + x) * 4, 4, x, W - x);
+      for (let y = oy < 2 ? oy + B : oy; y <= H - 2; y += B) for (let x = 0; x < W; x++) fix((y * W + x) * 4, W * 4, y, H - y);
+    }
+
+    // 2. Ringing / mosquito-noise filter: strong edges are found and widened by a few pixels; inside that zone (edge pixels excluded)
+    //    an edge-preserving bilateral filter is applied, so small oscillations are averaged while real detail (large differences) is kept.
+    function deringing(im, p) {
+      const W = im.width, H = im.height, d = im.data, N = W * H, R = p.r | 0, E = p.e, amp = Math.max(1, p.a), S = p.s / 100, F = Math.max(1, p.f | 0), Yp = new Uint8Array(N), edge = new Uint8Array(N);
+      for (let i = 0, k = 0; i < N; i++, k += 4) Yp[i] = (d[k] * 77 + d[k + 1] * 150 + d[k + 2] * 29) >> 8;
+      for (let y = 0; y < H; y++) { const y0 = Math.max(0, y - 1) * W, y1 = Math.min(H - 1, y + 1) * W, r = y * W; for (let x = 0; x < W; x++) { const g = Math.abs(Yp[r + Math.min(W - 1, x + 1)] - Yp[r + Math.max(0, x - 1)]) + Math.abs(Yp[y1 + x] - Yp[y0 + x]); if (g >= E) edge[r + x] = 1 } }
+      const tmp = new Uint8Array(N), zone = new Uint8Array(N), pre = new Int32Array(Math.max(W, H) + 1);
+      for (let y = 0; y < H; y++) { const r = y * W; for (let x = 0; x < W; x++) pre[x + 1] = pre[x] + edge[r + x]; for (let x = 0; x < W; x++) tmp[r + x] = pre[Math.min(W, x + R + 1)] - pre[Math.max(0, x - R)] > 0 ? 1 : 0 }
+      for (let x = 0; x < W; x++) { for (let y = 0; y < H; y++) pre[y + 1] = pre[y] + tmp[y * W + x]; for (let y = 0; y < H; y++) zone[y * W + x] = pre[Math.min(H, y + R + 1)] - pre[Math.max(0, y - R)] > 0 ? 1 : 0 }
+      const rl = new Float32Array(256), sl = [], s = new Uint8ClampedArray(d), sg = (F * .6 + .4) ** 2 * 2;
+      for (let i = 0; i < 256; i++) rl[i] = Math.exp(-(i * i) / (2 * amp * amp));
+      for (let dy = -F; dy <= F; dy++) for (let dx = -F; dx <= F; dx++) sl.push(dx, dy, Math.exp(-(dx * dx + dy * dy) / sg));
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x; if (!zone[i] || edge[i]) continue; const k = i * 4; if (!s[k + 3]) continue;
+        const yc = Yp[i]; let sw = 0, a = 0, b = 0, c = 0;
+        for (let q = 0; q < sl.length; q += 3) { const xx = x + sl[q], yy = y + sl[q + 1]; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; const j = yy * W + xx, kj = j * 4; if (!s[kj + 3]) continue; const w = sl[q + 2] * rl[Math.abs(Yp[j] - yc)]; sw += w; a += w * s[kj]; b += w * s[kj + 1]; c += w * s[kj + 2] }
+        d[k] = s[k] + (a / sw - s[k]) * S; d[k + 1] = s[k + 1] + (b / sw - s[k + 1]) * S; d[k + 2] = s[k + 2] + (c / sw - s[k + 2]) * S
+      }
+    }
+
+    // 3. Wavelet denoising: separable DWT (Haar or CDF 5/3 lifting) on Y / Cb / Cr. The threshold is either manual or chosen per band
+    //    with BayesShrink (noise level estimated from the finest diagonal band). Shifted extra passes ("cycle spinning") hide Haar blockiness.
+    const SQ2 = Math.SQRT2, ISQ2 = Math.SQRT1_2;
+    function dwtLine(a, n, t, inv, ty) {
+      const h = n >> 1;
+      if (!inv) {
+        if (ty === 0) for (let i = 0; i < h; i++) { const x0 = a[2 * i], x1 = a[2 * i + 1]; t[i] = (x0 + x1) * ISQ2; t[h + i] = (x0 - x1) * ISQ2 }
+        else {
+          for (let i = 0; i < h; i++) t[h + i] = a[2 * i + 1] - (a[2 * i] + (2 * i + 2 < n ? a[2 * i + 2] : a[n - 2])) * .5;
+          for (let i = 0; i < h; i++) t[i] = a[2 * i] + ((i > 0 ? t[h + i - 1] : t[h]) + t[h + i]) * .25;
+          for (let i = 0; i < h; i++) { t[i] *= SQ2; t[h + i] *= ISQ2 }
+        }
+      } else if (ty === 0) for (let i = 0; i < h; i++) { const s = a[i], e = a[h + i]; t[2 * i] = (s + e) * ISQ2; t[2 * i + 1] = (s - e) * ISQ2 }
+      else {
+        for (let i = 0; i < h; i++) t[2 * i] = a[i] * ISQ2 - ((i > 0 ? a[h + i - 1] : a[h]) + a[h + i]) * SQ2 * .25;
+        for (let i = 0; i < h; i++) t[2 * i + 1] = a[h + i] * SQ2 + (t[2 * i] + (2 * i + 2 < n ? t[2 * i + 2] : t[n - 2])) * .5
+      }
+      for (let i = 0; i < n; i++) a[i] = t[i]
+    }
+    function dwt2(P, W2, H2, L, inv, ty, line, tmp) {
+      const pass = l => {
+        const w = W2 >> l, h = H2 >> l, rows = () => { for (let y = 0; y < h; y++) { const o = y * W2; for (let x = 0; x < w; x++) line[x] = P[o + x]; dwtLine(line, w, tmp, inv, ty); for (let x = 0; x < w; x++) P[o + x] = line[x] } },
+          cols = () => { for (let x = 0; x < w; x++) { for (let y = 0; y < h; y++) line[y] = P[y * W2 + x]; dwtLine(line, h, tmp, inv, ty); for (let y = 0; y < h; y++) P[y * W2 + x] = line[y] } };
+        if (inv) { cols(); rows() } else { rows(); cols() }
+      };
+      if (inv) for (let l = L - 1; l >= 0; l--) pass(l); else for (let l = 0; l < L; l++) pass(l)
+    }
+    const shrinkRect = (P, W2, x0, x1, y0, y1, T, soft) => { for (let y = y0; y < y1; y++) for (let x = x0, i = y * W2 + x0; x < x1; x++, i++) { const v = P[i], a = v < 0 ? -v : v; P[i] = a <= T ? 0 : soft ? (v > 0 ? a - T : T - a) : v } };
+    const bandT = (P, W2, x0, x1, y0, y1, sg, k) => { let s2 = 0; for (let y = y0; y < y1; y++) for (let x = x0, i = y * W2 + x0; x < x1; x++, i++) s2 += P[i] * P[i]; s2 /= Math.max(1, (x1 - x0) * (y1 - y0)); const sx = Math.sqrt(Math.max(s2 - sg * sg, 0)); return sx < 1e-6 ? 1e9 : k * sg * sg / sx };
+    function estSigma(P, W2, x0, x1, y0, y1) {
+      const v = [], st = Math.max(1, Math.floor(Math.sqrt((x1 - x0) * (y1 - y0) / 20000)));
+      for (let y = y0; y < y1; y += st) for (let x = x0; x < x1; x += st) v.push(Math.abs(P[y * W2 + x]));
+      v.sort((a, b) => a - b); const n = Math.max(1, Math.floor(v.length * .85)); let s2 = 0; for (let i = 0; i < n; i++) s2 += v[i] * v[i]; return Math.sqrt(s2 / n) / .72
+    }
+    function waveletDenoise(im, p) {
+      const W = im.width, H = im.height, d = im.data, N = W * H, L = p.l | 0, m = 1 << L, W2 = Math.ceil((W + 1) / m) * m, H2 = Math.ceil((H + 1) / m) * m, ty = p.w === 'Haar' ? 0 : 1, soft = p.m !== tr('Dur'), auto = p.a !== tr('Manuel'), kf = (p.k == null ? 100 : p.k) / 100;
+      const shifts = p.q === tr('Très lissé') ? [[0, 0], [1, 1], [1, 0], [0, 1]] : p.q === tr('Lissé') ? [[0, 0], [1, 1]] : [[0, 0]];
+      const P = new Float32Array(W2 * H2), line = new Float32Array(Math.max(W2, H2)), tmp = new Float32Array(Math.max(W2, H2)), res = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+      for (let c = 0; c < 3; c++) {
+        const T0 = c === 0 ? p.y : p.c;
+        for (const [sx, sy] of shifts) {
+          for (let y = 0; y < H2; y++) { const yy = Math.min(H - 1, Math.max(0, y - sy)) * W; for (let x = 0; x < W2; x++) { const k = (yy + Math.min(W - 1, Math.max(0, x - sx))) * 4, Y = .299 * d[k] + .587 * d[k + 1] + .114 * d[k + 2]; P[y * W2 + x] = c === 0 ? Y : c === 1 ? (d[k + 2] - Y) / 1.772 : (d[k] - Y) / 1.402 } }
+          dwt2(P, W2, H2, L, false, ty, line, tmp);
+          const sg = auto ? estSigma(P, W2, W2 >> 1, W2, H2 >> 1, H2) : 0;
+          for (let l = 0; l < L; l++) {
+            const w = W2 >> l, h = H2 >> l, w1 = w >> 1, h1 = h >> 1;
+            if (auto) for (const [x0, x1, y0, y1] of [[w1, w, 0, h1], [0, w1, h1, h], [w1, w, h1, h]]) shrinkRect(P, W2, x0, x1, y0, y1, bandT(P, W2, x0, x1, y0, y1, sg, kf), soft);
+            else { const T = T0 * [1, .75, .5][l]; shrinkRect(P, W2, w1, w, 0, h1, T, soft); shrinkRect(P, W2, 0, w1, h1, h, T, soft); shrinkRect(P, W2, w1, w, h1, h, T, soft) }
+          }
+          dwt2(P, W2, H2, L, true, ty, line, tmp);
+          const r = res[c]; for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) r[y * W + x] += P[(y + sy) * W2 + x + sx]
+        }
+      }
+      const k = 1 / shifts.length;
+      for (let i = 0; i < N; i++) { const Y = res[0][i] * k, Cb = res[1][i] * k, Cr = res[2][i] * k, R = Y + 1.402 * Cr, B = Y + 1.772 * Cb, j = i * 4; d[j] = R; d[j + 1] = (Y - .299 * R - .114 * B) / .587; d[j + 2] = B }
+    }
+
+    // 4. Automatic restoration: the three filters chained, driven by a single strength slider.
+    function autoDecompress(im, p) {
+      // parameters tuned on real JPEG-compressed test images; F (0..100) scales every filter at once
+      const F = p.f;
+      deblock(im, { b: 8, g: tr('Automatique'), x: 0, y: 0, t: 12 + F * .32, f: Math.min(50, 20 + F * .5), n: F > 66 ? 3 : 2, s: 45 });
+      deringing(im, { e: 70 - F * .2, r: Math.round(2 + F * .04), f: 2, a: 6 + F * .2, s: Math.min(100, 50 + F * .8) });
+      if (p.w !== tr('Non')) waveletDenoise(im, { w: 'Haar', l: 1, a: tr('Manuel'), k: 100, y: 2 + F * .08, c: 4 + F * .16, m: tr('Doux'), q: tr('Lissé') })
+    }
+
+    // 5. Palette compression: an adaptive palette (median cut + k-means refinement on a 15-bit histogram) limits the number of colours,
+    //    and dithering spreads the quantisation error so that the colours stay the same once the image is zoomed out.
+    const BAYER8 = (() => { let m = [[0]]; while (m.length < 8) { const n = m.length, o = []; for (let y = 0; y < 2 * n; y++) { o.push([]); for (let x = 0; x < 2 * n; x++) o[y].push(4 * m[y % n][x % n] + [[0, 2], [3, 1]][(y / n) | 0][(x / n) | 0]) } m = o } return m.flat() })();
+    function paletteCompress(im, p) {
+      const W = im.width, H = im.height, d = im.data, N = W * H, K = Math.max(2, Math.min(256, p.n | 0));
+      const cnt = new Uint32Array(32768), sr = new Float64Array(32768), sg = new Float64Array(32768), sb = new Float64Array(32768);
+      for (let i = 0, k = 0; i < N; i++, k += 4) { if (!d[k + 3]) continue; const key = (d[k] >> 3) << 10 | (d[k + 1] >> 3) << 5 | d[k + 2] >> 3; cnt[key]++; sr[key] += d[k]; sg[key] += d[k + 1]; sb[key] += d[k + 2] }
+      const bins = []; for (let i = 0; i < 32768; i++) if (cnt[i]) bins.push(i); if (!bins.length) return;
+      const cr = new Float32Array(32768), cg = new Float32Array(32768), cb = new Float32Array(32768);
+      for (const b of bins) { cr[b] = sr[b] / cnt[b]; cg[b] = sg[b] / cnt[b]; cb[b] = sb[b] / cnt[b] }
+      const CH = [cr, cg, cb], WTS = [1.41, 2, 1.73]; // square roots of the 2/4/3 perceptual weights
+      const info = box => { const lo = [255, 255, 255], hi = [0, 0, 0]; let n = 0; for (const b of box.b) { n += cnt[b]; for (let c = 0; c < 3; c++) { const v = CH[c][b]; if (v < lo[c]) lo[c] = v; if (v > hi[c]) hi[c] = v } } box.rng = [0, 1, 2].map(c => (hi[c] - lo[c]) * WTS[c]); box.n = n; box.pri = Math.max(...box.rng) * Math.sqrt(n); return box };
+      const boxes = [info({ b: bins })];
+      while (boxes.length < K) {
+        let bi = -1, bp = 0; boxes.forEach((b, i) => { if (b.b.length > 1 && b.pri > bp) { bp = b.pri; bi = i } }); if (bi < 0) break;
+        const box = boxes[bi], ch = box.rng.indexOf(Math.max(...box.rng)), arr = CH[ch]; box.b.sort((a, b) => arr[a] - arr[b]);
+        let acc = 0, cut = 1; for (let i = 0; i < box.b.length - 1; i++) { acc += cnt[box.b[i]]; cut = i + 1; if (acc >= box.n / 2) break }
+        boxes.splice(bi, 1, info({ b: box.b.slice(0, cut) }), info({ b: box.b.slice(cut) }))
+      }
+      const nP = boxes.length, pr = new Float32Array(nP), pg = new Float32Array(nP), pb = new Float32Array(nP);
+      boxes.forEach((box, j) => { let a = 0, b2 = 0, c = 0; for (const b of box.b) { a += cr[b] * cnt[b]; b2 += cg[b] * cnt[b]; c += cb[b] * cnt[b] } pr[j] = a / box.n; pg[j] = b2 / box.n; pb[j] = c / box.n });
+      const nearest = (r, g, b) => { let best = 0, bd = 1e12; for (let j = 0; j < nP; j++) { const x = r - pr[j], y = g - pg[j], z = b - pb[j], dd = 2 * x * x + 4 * y * y + 3 * z * z; if (dd < bd) { bd = dd; best = j } } return best };
+      for (let it = 0; it < (p.i | 0); it++) {
+        const ns = new Float64Array(nP * 4); for (const b of bins) { const j = nearest(cr[b], cg[b], cb[b]), w = cnt[b]; ns[j * 4] += cr[b] * w; ns[j * 4 + 1] += cg[b] * w; ns[j * 4 + 2] += cb[b] * w; ns[j * 4 + 3] += w }
+        for (let j = 0; j < nP; j++) if (ns[j * 4 + 3]) { pr[j] = ns[j * 4] / ns[j * 4 + 3]; pg[j] = ns[j * 4 + 1] / ns[j * 4 + 3]; pb[j] = ns[j * 4 + 2] / ns[j * 4 + 3] }
+      }
+      for (let j = 0; j < nP; j++) { pr[j] = Math.round(pr[j]); pg[j] = Math.round(pg[j]); pb[j] = Math.round(pb[j]) }
+      const lut = new Uint8Array(32768); for (let key = 0; key < 32768; key++) lut[key] = cnt[key] ? nearest(cr[key], cg[key], cb[key]) : nearest(((key >> 10) & 31) * 8 + 4, ((key >> 5) & 31) * 8 + 4, (key & 31) * 8 + 4);
+      const q = (r, g, b) => lut[((r < 0 ? 0 : r > 255 ? 255 : r) >> 3) << 10 | ((g < 0 ? 0 : g > 255 ? 255 : g) >> 3) << 5 | (b < 0 ? 0 : b > 255 ? 255 : b) >> 3], str = p.s / 100, mode = p.d;
+      if (mode === 'Floyd–Steinberg' || mode === 'Atkinson') {
+        const at = mode === 'Atkinson', pad = 2, rw = (W + 2 * pad) * 3, rows = [new Float32Array(rw), new Float32Array(rw), new Float32Array(rw)];
+        for (let y = 0; y < H; y++) {
+          const cur = rows[y % 3], n1 = rows[(y + 1) % 3], n2 = rows[(y + 2) % 3], dir = !at && y & 1 ? -1 : 1; n2.fill(0);
+          for (let xi = 0; xi < W; xi++) {
+            const x = dir > 0 ? xi : W - 1 - xi, k = (y * W + x) * 4; if (!d[k + 3]) continue; const o = (x + pad) * 3, r = d[k] + cur[o], g = d[k + 1] + cur[o + 1], b = d[k + 2] + cur[o + 2], j = q(r | 0, g | 0, b | 0);
+            d[k] = pr[j]; d[k + 1] = pg[j]; d[k + 2] = pb[j];
+            const er = (r - pr[j]) * str, eg = (g - pg[j]) * str, eb = (b - pb[j]) * str, add = (row, dx, f) => { const q2 = o + dx * 3; row[q2] += er * f; row[q2 + 1] += eg * f; row[q2 + 2] += eb * f };
+            if (at) { add(cur, 1, 1 / 8); add(cur, 2, 1 / 8); add(n1, -1, 1 / 8); add(n1, 0, 1 / 8); add(n1, 1, 1 / 8); add(n2, 0, 1 / 8) }
+            else { add(cur, dir, 7 / 16); add(n1, -dir, 3 / 16); add(n1, 0, 5 / 16); add(n1, dir, 1 / 16) }
+          }
+          cur.fill(0)
+        }
+      } else {
+        const spread = mode === tr('Ordonné (Bayer)') ? 255 / Math.cbrt(nP) * str * 0.3 : 0;
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const k = (y * W + x) * 4; if (!d[k + 3]) continue; const t = spread ? (BAYER8[(y & 7) * 8 + (x & 7)] / 64 - .5) * spread : 0, j = q((d[k] + t) | 0, (d[k + 1] + t) | 0, (d[k + 2] + t) | 0); d[k] = pr[j]; d[k + 1] = pg[j]; d[k + 2] = pb[j] }
+      }
+    }
+
+    // ---------- Restore the pixel perfect mode saved by the previous session
+    try { if (localStorage.getItem('kl-pp') === '1' && !PP) A.pp() } catch (e) { }
+
+    // ---------- Extensions: persistent storage, safe startup, API
+    var curExt = null; const FXM = {}, EXTS = {};
+    const extList = async () => { let l = null; try { l = await idb('get', 'exts') } catch (e) { } if (!Array.isArray(l)) { try { l = JSON.parse(localStorage.getItem('kl-exts') || 'null') } catch (e) { } } return Array.isArray(l) ? l : [] };
+    const extSave = async l => {
+      let ok = 0; try { await idb('set', 'exts', l); ok = 1 } catch (e) { }
+      try { const j = JSON.stringify(l); if (j.length < 1.5e6) localStorage.setItem('kl-exts', j); else localStorage.removeItem('kl-exts') } catch (e) { if (!ok) say(tr('Impossible de mémoriser les extensions : stockage indisponible.')) }
+      try { navigator.storage && navigator.storage.persist && navigator.storage.persist() } catch (e) { }
+    };
+    const extMeta = (code, fname) => { const m = {}; for (const r of code.slice(0, 3000).matchAll(/@(name|version|author|description)[ \t]+(.+)/g)) m[r[1]] = r[2].trim(); if (!m.name) m.name = fname.replace(/\.m?js$/i, ''); return m };
+    const extState = x => x.on === false ? 'off' : EXTS[x.name] && EXTS[x.name].state === 'error' ? 'err' : 'ok';
+    function extStop(x, keepErr) {
+      const st = EXTS[x.name]; if (!st) return;
+      st.un.forEach(f => { try { f() } catch (e) { } }); st.els.forEach(e => e.remove()); st.fx.forEach(id => { delete FX[id]; delete FXM[id] }); st.els = []; st.fx = []; st.un = [];
+      if (!keepErr) delete EXTS[x.name]; sweepGroups()
+    }
+    function extStart(x) {
+      const st = EXTS[x.name] = { name: x.meta.name || x.name, state: 'ok', err: '', els: [], fx: [], un: [] };
+      try { localStorage.setItem('kl-extboot', x.name) } catch (e) { }
+      curExt = st;
+      try { (0, eval)(x.code + '\n//# sourceURL=kollage-ext-' + encodeURIComponent(x.name)) } catch (e) { st.state = 'error'; st.err = (e && e.message) || String(e) }
+      finally { curExt = null; try { localStorage.removeItem('kl-extboot') } catch (e) { } }
+      if (st.state === 'error') extStop(x, true);
+      return st.state === 'ok'
+    }
+    async function extInstall(fname, code) {
+      fname = String(fname).replace(/[\\/]/g, '_');
+      try { new Function(code) } catch (e) { say(tr('Extension invalide : ') + fname + ' — ' + e.message); return false }
+      const l = await extList(), x = { name: fname, code, meta: extMeta(code, fname), on: true, added: Date.now() }, j = l.findIndex(q => q.name === x.name);
+      if (j >= 0) { extStop(l[j]); x.on = l[j].on !== false; l[j] = x } else l.push(x);
+      await extSave(l); if (x.on) extStart(x); const st = EXTS[x.name];
+      say(st && st.state === 'error' ? tr('Extension en erreur : ') + st.err : tr('Extension installée : ') + x.meta.name + tr(' (conservée pour les prochaines sessions)')); return true
+    }
+    function extAdd() {
+      return new Promise(res => {
+        const inp = E('input', { type: 'file', accept: '.js,.mjs,text/javascript', multiple: true, onchange: async () => { for (const f of inp.files) await extInstall(f.name, await f.text()); res(await extList()) } });
+        inp.click()
+      })
+    }
+    function extBoot() {
+      return (async () => {
+        if (/safe/.test(location.hash)) { say(tr('Mode sans échec : extensions non chargées.')); return }
+        const l = await extList(); let bad = null; try { bad = localStorage.getItem('kl-extboot'); localStorage.removeItem('kl-extboot') } catch (e) { }
+        let ch = 0; for (const x of l) { if (bad && x.name === bad && x.on !== false) { x.on = false; ch = 1; continue } if (x.on !== false) extStart(x) }
+        if (ch) { await extSave(l); say(tr('Une extension a bloqué le démarrage et a été désactivée : ') + bad) }
+      })()
+    }
+    const extOnUnload = fn => { if (curExt && typeof fn === 'function') curExt.un.push(fn) };
+    const EXT_SAMPLE = `// @name Kollage example\n// @version 1.0\n// @author Me\n// @description Adds a "Red tint" effect and a command in the Extensions menu.\n\nKollage.addEffect('example_red', {\n  n: 'Red tint',\n  p: [{ k: 'f', l: 'Strength', min: 0, max: 100, v: 50 }],\n  px: (im, p) => { const d = im.data; for (let i = 0; i < d.length; i += 4) d[i] = Math.min(255, d[i] + p.f * 1.5); }\n});\n\nKollage.addMenuItem('Extensions', 'Say hello', () => Kollage.say('Hello from an extension!'));\n`;
+    const EXT_HELP = '// @name  @version  @author  @description  (en-têtes facultatifs)\n\nKollage.addMenuItem(\"Effets/Flous\", libellé, fn)  (chemin dans les menus)\nKollage.addEffect(id, { n, group:\"Flous\" | \"Mon groupe\" | \"Flous/Sous-groupe\", p:[{k,l,min,max,v}], px:(imageData,p)=>{} })\nKollage.addGroup(\"Effets/Mon groupe\")   (créé s’il n’existe pas)\nKollage.layer()  → { canvas, ctx } du calque actif\nKollage.commit(nom)  → valide et ajoute à l’historique\nKollage.say(texte)\nKollage.onUnload(fn)  → nettoyage à la désactivation\n\n● vert = élément fourni par une extension.\n\nAppelez ces fonctions pendant l’exécution du fichier : c’est ce qui permet de les retirer proprement à la désactivation. Ouvrez Kollage avec #safe à la fin de l’adresse pour démarrer sans extensions.';
+
+    function fxIndex() {
+      const out = [], walk = (items, top, sub) => items.forEach(it => { if (it === '-') return; if (Array.isArray(it[1])) walk(it[1], top, it[0]); else if (typeof it[1] === 'string' && it[1].startsWith('fx:')) out.push({ id: it[1].slice(3), name: it[0].replace(/…$/, ''), menus: [top, sub].filter(Boolean), author: 'Kollage', builtin: 1 }) });
+      for (const k in M) walk(M[k], k, null);
+      for (const id in FXM) if (FX[id]) out.push({ id, name: FX[id].n, menus: FXM[id].menus, author: FXM[id].ext, builtin: 0 });
+      return out
+    }
+    async function extMgr() {
+      let exts = await extList(), bm = [], q = '', sel = null, onlyB = false, onlyBM = false, kf = false, close, all = [], kws = [], aus = [], mns = [];
+      try { bm = JSON.parse(localStorage.getItem('kl-fxbm') || '[]') } catch (e) { }
+      const bmSave = () => { try { localStorage.setItem('kl-fxbm', JSON.stringify(bm)) } catch (e) { } }, sets = { k: new Set(), a: new Set(), m: new Set() };
+      const sbox = 'border:1px solid #828790;background:#fff;color:#000;overflow:auto;', sm = 'font-size:11px', ICON = { ok: '✔', err: '⚠', off: '☐' };
+      const build = () => {
+        const fxs = fxIndex();
+        all = [...fxs.map(f => ({ ...f, key: 'f:' + f.id, label: tr(f.name), kw: [...f.menus.map(tr), ...(f.builtin ? [tr('intégré')] : []), ...tr(f.name).toLowerCase().split(/[^a-zà-ÿ]+/).filter(w => w.length > 3)] })),
+          ...exts.map((x, i) => ({ ext: 1, idx: i, key: 'e:' + x.name, label: x.meta.name || x.name, menus: ['Extensions'], author: x.meta.author || tr('- inconnu -'), kw: [tr('extension')], x }))];
+        kws = [...new Set(all.flatMap(i => i.kw))].sort(); aus = [...new Set(all.map(i => i.author))].sort(); mns = [...new Set(all.flatMap(i => i.menus.map(tr)))].sort();
+        if (sel) sel = all.find(i => i.key === sel.key) || null
+      };
+      const vis = () => all.filter(i => (!q || i.label.toLowerCase().includes(q)) && (!sets.k.size || i.kw.some(v => sets.k.has(v))) && (!sets.a.size || sets.a.has(i.author)) && (!sets.m.size || i.menus.some(v => sets.m.has(tr(v)))) && (!onlyB || i.builtin) && (!onlyBM || bm.includes(i.key)));
+      const lists = {}, mkList = (id, title) => {
+        const l = E('div', { style: sbox + 'height:104px', role: 'listbox', tabIndex: -1, 'aria-label': tr(title), 'aria-multiselectable': 'true' }), c = E('span', { style: 'flex:1;' + sm }), rb = E('button', { textContent: tr('Réinitialiser'), onclick: () => { sets[id].clear(); draw() }, style: sm });
+        lists[id] = { l, c }; return E('div', { style: 'display:flex;flex-direction:column;gap:3px' }, E('div', { style: 'display:flex;align-items:center;gap:6px' }, E('b', { textContent: tr(title), style: sm }), c, rb), l)
+      };
+      const mid = E('div', { style: sbox + 'height:300px;flex:1', role: 'listbox', 'aria-label': tr('Effets et extensions') }), info = E('div', { style: sbox + 'height:260px;padding:6px;font-size:12px;line-height:1.45;white-space:pre-wrap', 'aria-live': 'polite' }), cnt = E('div', { style: 'text-align:center;' + sm }), foot = E('div', { style: sm });
+      const search = E('input', { type: 'text', placeholder: tr('Recherche par mot-clé'), 'aria-label': tr('Recherche par mot-clé'), style: 'width:100%;box-sizing:border-box', oninput: () => { q = search.value.toLowerCase(); draw() } });
+      const bt = () => E('button', { style: 'flex:1;padding:5px' }), b1 = bt(), b2 = bt(), b3 = bt(), b4 = bt(), row2 = E('div', { style: 'display:flex;gap:6px' }, b3, b4);
+      const cb = (t, f) => { const i = E('input', { type: 'checkbox', onchange: () => { f(i.checked); draw() } }); return E('label', { style: sm }, i, ' ' + tr(t)) };
+      const refresh = async () => { exts = await extList(); build(); draw() };
+      const pick = (i, focus) => { sel = i; kf = !!focus; draw() };
+      const primary = () => { if (sel) b2.onclick() };
+      const draw = () => {
+        for (const id in lists) {
+          const L = lists[id], d = id === 'k' ? kws : id === 'a' ? aus : mns; L.l.innerHTML = '';
+          d.forEach(v => { const on = sets[id].has(v), tg = () => { on ? sets[id].delete(v) : sets[id].add(v); draw() }; L.l.append(E('div', { textContent: v, role: 'option', tabIndex: 0, 'aria-selected': on, style: 'padding:1px 6px;cursor:default;white-space:nowrap;' + (on ? 'background:#cce8ff' : ''), onclick: tg, onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tg() } } })) });
+          L.c.textContent = sets[id].size + ' / ' + d.length
+        }
+        const v = vis(); mid.innerHTML = ''; let fe = null;
+        v.forEach((i, n) => { const on = sel && sel.key === i.key, st = i.ext ? extState(i.x) : 'ok', e = E('div', { role: 'option', tabIndex: on || (!sel && !n) ? 0 : -1, 'aria-selected': !!on, style: 'display:flex;gap:6px;padding:2px 6px;cursor:default;' + (on ? 'background:#cce8ff' : ''), onclick: () => pick(i), ondblclick: () => primary(), onkeydown: ev => { const k = ev.key; if (k === 'ArrowDown' || k === 'ArrowUp') { ev.preventDefault(); const t = v[n + (k === 'ArrowDown' ? 1 : -1)]; if (t) pick(t, 1) } else if (k === 'Enter') { ev.preventDefault(); if (!on) pick(i, 1); else primary() } else if (k === ' ') { ev.preventDefault(); pick(i, 1) } else if (k === 'Home') { ev.preventDefault(); pick(v[0], 1) } else if (k === 'End') { ev.preventDefault(); pick(v[v.length - 1], 1) } } }, E('span', { textContent: i.ext ? ICON[st] : i.builtin ? '✦' : '●', title: i.ext ? tr(st === 'ok' ? 'Active' : st === 'err' ? 'En erreur' : 'Désactivée') : i.builtin ? '' : tr('Fournie par une extension'), style: 'width:14px;color:' + (st === 'err' ? '#c60' : i.ext || i.builtin ? '#2a6fb5' : '#2fb344') }), E('span', { textContent: i.label, style: 'flex:1' }), E('span', { textContent: bm.includes(i.key) ? '★' : '', title: tr('Favori'), style: 'color:#d9a400' })); if (on) fe = e; mid.append(e) });
+        if (!v.length) mid.append(E('div', { textContent: tr('Aucun résultat.'), style: 'padding:8px;opacity:.7' }));
+        if (kf && fe) { fe.focus(); fe.scrollIntoView({ block: 'nearest' }) } kf = false;
+        cnt.textContent = v.length + ' ' + tr('effets / extensions'); foot.textContent = fxIndex().filter(f => f.builtin).length + ' ' + tr('intégrés') + ' / ' + exts.length + ' ' + tr('extensions');
+        if (!sel) { info.textContent = tr('Choisissez un élément pour voir ses informations.') + '\n\n' + EXT_HELP; b1.disabled = b2.disabled = true; row2.style.display = 'none'; b1.textContent = tr('Ajouter aux favoris'); b2.textContent = tr('Lancer l’effet'); return }
+        b1.disabled = b2.disabled = false;
+        if (sel.ext) {
+          const x = sel.x, st = extState(x), E0 = EXTS[x.name];
+          info.textContent = sel.label + '\n' + tr('État :') + ' ' + tr(st === 'ok' ? 'Active' : st === 'err' ? 'En erreur' : 'Désactivée') + (st === 'err' && E0 ? '\n' + E0.err : '') + '\n' + tr('Auteur :') + ' ' + sel.author + (x.meta.version ? '\n' + tr('Version :') + ' ' + x.meta.version : '') + '\n' + tr('Fichier :') + ' ' + x.name + ' (' + Math.max(1, Math.round(x.code.length / 1024)) + ' Ko)\n\n' + (x.meta.description || '') + '\n\n' + tr('Cette extension est mémorisée et rechargée à chaque démarrage.');
+          b1.textContent = tr('Supprimer'); b2.textContent = x.on === false ? tr('Activer') : tr('Désactiver'); b3.textContent = tr('Recharger'); b4.textContent = tr('Exporter'); row2.style.display = 'flex'
+        } else {
+          const p = FX[sel.id] && FX[sel.id].p ? '\n\n' + tr('Paramètres :') + ' ' + FX[sel.id].p.map(z => tr(z.l)).join(', ') : '';
+          info.textContent = sel.label + '\n' + tr('Menu :') + ' ' + sel.menus.map(tr).join(' > ') + '\n' + tr(sel.builtin ? 'Auteur :' : 'Fournie par l’extension :') + ' ' + sel.author + p;
+          b1.textContent = bm.includes(sel.key) ? tr('Retirer des favoris') : tr('Ajouter aux favoris'); b2.textContent = tr('Lancer l’effet'); row2.style.display = 'none'
+        }
+      };
+      b1.onclick = async () => { if (!sel) return; if (sel.ext) { const x = sel.x; extStop(x); exts.splice(sel.idx, 1); await extSave(exts); sel = null; say(tr('Extension supprimée.')); await refresh(); return } const i = bm.indexOf(sel.key); i < 0 ? bm.push(sel.key) : bm.splice(i, 1); bmSave(); draw() };
+      b2.onclick = async () => { if (!sel) return; if (sel.ext) { const x = sel.x; x.on = x.on === false; await extSave(exts); if (x.on) { extStart(x); const s = EXTS[x.name]; say(s && s.state === 'error' ? tr('Extension en erreur : ') + s.err : tr('Extension activée.')) } else { extStop(x); say(tr('Extension désactivée.')) } await refresh(); return } if (!D) return; close(); run('fx:' + sel.id) };
+      b3.onclick = async () => { if (!sel || !sel.ext) return; const x = sel.x; extStop(x); if (x.on !== false) { extStart(x); const s = EXTS[x.name]; say(s && s.state === 'error' ? tr('Extension en erreur : ') + s.err : tr('Extension rechargée.')) } await refresh() };
+      b4.onclick = () => { if (sel && sel.ext) dl(sel.x.name, new Blob([sel.x.code], { type: 'text/javascript' })) };
+      build();
+      const left = E('div', { style: 'display:flex;flex-direction:column;gap:6px;flex:0 0 190px;min-width:0' }, mkList('k', 'Mots-clés'), mkList('a', 'Auteurs'), mkList('m', 'Menus'));
+      const mcol = E('div', { style: 'display:flex;flex-direction:column;gap:4px;flex:1 1 220px;min-width:0' }, search, mid, cnt);
+      const rcol = E('div', { style: 'display:flex;flex-direction:column;gap:6px;flex:1 1 200px;min-width:0' }, info, E('div', { style: 'display:flex;gap:6px' }, b1, b2), row2);
+      const top = mrow(mbtn('Installer une extension…', async () => { await extAdd(); await refresh() }), mbtn('Exemple d’extension', () => dl('example-kollage.js', new Blob([EXT_SAMPLE], { type: 'text/javascript' }))), E('span', { textContent: tr('ou glissez un fichier .js dans cette fenêtre'), style: sm + ';opacity:.8' }));
+      const bx = $('wdlgb');
+      draw();
+      close = modal('Gestionnaire d’extensions', [top, E('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, left, mcol, rcol),
+        E('div', { style: 'display:flex;align-items:center;gap:14px;flex-wrap:wrap' }, cb('Intégrés seulement', v => onlyB = v), cb('Favoris seulement', v => onlyBM = v), E('span', { style: 'flex:1' }), foot, mbtn('Fermer', () => close()))], 800);
+      if (bx) { bx.ondragover = e => { e.preventDefault(); e.stopPropagation() }; bx.ondrop = async e => { e.preventDefault(); e.stopPropagation(); for (const f of [...e.dataTransfer.files]) if (/\.m?js$/i.test(f.name)) await extInstall(f.name, await f.text()); await refresh() } }
+      if (search && close) search.focus()
+    }
+    A.extmgr = extMgr;
+    // ---- Menus: effect groups created or extended by extensions
+    const norm = s => String(s).toLowerCase().trim(), pth = x => Array.isArray(x) ? x.map(String) : String(x || '').split('/').map(s => s.trim()).filter(Boolean);
+    const canonName = n => { const l = norm(n); for (const k in I) if (typeof I[k] === 'string' && norm(I[k]) === l) return k; return n };
+    const nameMatch = (txt, n) => [n, canonName(n), tr(canonName(n)), tr(n)].some(v => norm(v) === norm(txt));
+    function mkGroup(d, name) {
+      const g = E('div', { className: 'it has ext', title: curExt ? tr('Extension : ') + curExt.name : '' }, E('span', { textContent: name }), E('div', { className: 'dd' })); g.dataset.extGroup = '1';
+      g.onclick = ev => { ev.stopPropagation(); [...d.children].forEach(s => s !== g && s.classList.remove('so')); g.classList.toggle('so') };
+      d.append(g); if (curExt) curExt.els.push(g); return g
+    }
+    function menuDD(path, create) {
+      const ms = [...document.querySelectorAll('#mb .menu')], top = n => ms.find(e => nameMatch(e.firstChild.textContent, n)); let m = top(path[0]), rest = path.slice(1);
+      if (!m) { m = top('Extensions'); rest = path } if (!m) return null; let d = m.querySelector('.dd');
+      for (const seg of rest) { let g = [...d.children].find(c => c.classList.contains('has') && nameMatch(c.firstChild.textContent, seg)); if (!g) { if (!create) return null; g = mkGroup(d, seg) } d = g.querySelector('.dd') }
+      return d
+    }
+    function sweepGroups() { let ch = true; while (ch) { ch = false; document.querySelectorAll('#mb .it.has[data-ext-group]').forEach(g => { if (!g.querySelector('.dd .it')) { g.remove(); ch = true } }) } }
+    function addGroup(path) { return !!menuDD(pth(path), true) }
+    function addMenuItem(menu, label, fn) {
+      const d = menuDD(pth(menu), true); if (!d) return false;
+      const e = E('div', { className: 'it' + (curExt ? ' ext' : ''), title: curExt ? tr('Extension : ') + curExt.name : '' }, E('span', { textContent: label }), E('i')); e.onclick = ev => { ev.stopPropagation(); closeM(); if (D) { commitText(); try { fn() } catch (er) { say(tr('Erreur dans l’extension : ') + er.message) } } }; d.append(e); if (curExt) curExt.els.push(e); return true
+    }
+    function addEffect(id, def) {
+      const path = ['Effets', ...pth(def.group)]; FX[id] = def; FXM[id] = { ext: curExt ? curExt.name : '?', menus: path.map(canonName) }; if (curExt) curExt.fx.push(id);
+      return addMenuItem(path, tr(def.n) + (def.p ? '…' : ''), () => runFx(id))
+    }
+    setTimeout(extBoot, 0);
+
+    // ---------- Android (Capacitor): save through the native Filesystem / Share plugins.
+    // The page has no bundled Capacitor runtime, so plugins are reached through the native bridge that Capacitor injects.
+    // Preferred route: window.KollageAndroid.save(), added to MainActivity by the packager (MediaStore, no plugin needed).
+    // Fallback: Capacitor Filesystem / Share plugins through the native bridge.
+    const hasSaver = () => !!(window.KollageAndroid && (typeof window.KollageAndroid.save === 'function' || typeof window.KollageAndroid.saveAs === 'function'));
+    const mimeOf = n => ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp', svg: 'image/svg+xml', pdf: 'application/pdf', json: 'application/json', txt: 'text/plain', gpl: 'text/plain', hex: 'text/plain', pal: 'text/plain', js: 'text/javascript' })[(n.split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
+    function isNativeApp() {
+      if (hasSaver()) return true;
+      const C = window.Capacitor; if (!C) return false;
+      try { if (typeof C.isNativePlatform === 'function') return !!C.isNativePlatform(); if (typeof C.getPlatform === 'function') return C.getPlatform() !== 'web' } catch (e) { }
+      return !!(window.androidBridge || C.isNative)
+    }
+    function capCall(plugin, method, opts) {
+      const C = window.Capacitor; if (!C) return Promise.reject(new Error('Capacitor not available'));
+      const P = C.Plugins && C.Plugins[plugin];
+      if (P && typeof P[method] === 'function') return P[method](opts);
+      if (typeof C.nativePromise === 'function') return C.nativePromise(plugin, method, opts);
+      if (typeof C.toNative === 'function') return new Promise((res, rej) => C.toNative(plugin, method, opts, { resolve: res, reject: rej }));
+      return Promise.reject(new Error('Capacitor bridge not available'))
+    }
+    let permAsked = false;
+    const klB64 = blob => new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = () => ko(r.error); r.readAsDataURL(blob) });
+    async function nativeSave(name, b) {
+      window.__klLastUri = null;
+      const why = e => (e && (e.message || e.errorMessage)) || String(e), log = [];
+      try {
+        const blob = b instanceof Blob ? b : new Blob([b]);
+        const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = () => ko(r.error); r.readAsDataURL(blob) });
+        if (hasSaver()) {
+          const K = window.KollageAndroid, mime = blob.type || mimeOf(name);
+          // 1. system "Save as" dialog: the user picks the folder, the result comes back through window.__kollageSaved
+          if (typeof K.saveAs === 'function') {
+            try {
+              const res = await new Promise(resolve => {
+                // the dialog must hide the page; if it never does (or never answers after coming back), carry on with the next route
+                let hidden = false, done = false, timer = 0; const fin = r => { if (done) return; done = true; clearTimeout(timer); document.removeEventListener('visibilitychange', vc); resolve(r) };
+                const vc = () => { if (document.hidden) hidden = true; else if (hidden) setTimeout(() => fin('ERR:no answer from the system dialog'), 4000) };
+                document.addEventListener('visibilitychange', vc); timer = setTimeout(() => { if (!hidden) fin('ERR:the system dialog did not open') }, 20000);
+                window.__kollageSaved = fin; const r = String(K.saveAs(name, mime, data)); if (r !== 'PENDING') fin(r)
+              });
+              if (res.startsWith('OK:')) { window.__klLastUri = res.slice(3); say(tr('Enregistré : ') + name); return }
+              if (res === 'CANCEL') { say(tr('Enregistrement annulé.')); return }
+              log.push('Android (Save as): ' + res.replace(/^ERR:/, ''))
+            } catch (e) { log.push('Android (Save as): ' + why(e)) }
+          }
+          // 2. silent save into Downloads/Kollage
+          if (typeof K.save === 'function') try { const r = String(K.save(name, mime, data)); if (r.startsWith('OK:')) { window.__klLastUri = ''; say(tr('Enregistré : ') + r.slice(3)); return } log.push('Android: ' + r.slice(4)) } catch (e) { log.push('Android: ' + why(e)) }
+        } else log.push(tr('Composant natif absent : recompilez l’APK avec le html-packager.sh mis à jour.'));
+        if (!permAsked) { permAsked = true; try { await capCall('Filesystem', 'requestPermissions', {}) } catch (e) { } }
+        try { await capCall('Filesystem', 'writeFile', { path: 'Kollage/' + name, data, directory: 'DOCUMENTS', recursive: true }); window.__klLastUri = ''; say(tr('Enregistré dans Documents/Kollage : ') + name); return }
+        catch (e) { log.push('Documents: ' + why(e)) }
+        // public folder refused (scoped storage): write to the app cache and let the user pick a destination in the share sheet
+        const r = await capCall('Filesystem', 'writeFile', { path: name, data, directory: 'CACHE' });
+        try { await capCall('Share', 'share', { title: name, url: r.uri, dialogTitle: name }); window.__klLastUri = '' } catch (e) { if (!/cancel/i.test(why(e))) throw e }
+      } catch (e) { log.push(why(e)); exportPanel(name, b instanceof Blob ? b : new Blob([b]), tr('Échec de l’enregistrement automatique :') + '\n' + log.join('\n')) }
+    }
+
+    // ---------- Export panel: every route that needs a real tap from the user (works in browsers and in plain WebViews alike)
+    function exportPanel(name, blob, problem) {
+      blob = blob instanceof Blob ? blob : new Blob([blob]); const url = URL.createObjectURL(blob), isImg = /^image\//.test(blob.type), UA = navigator.userAgent;
+      let close; const done = () => { if (close) close(); setTimeout(() => URL.revokeObjectURL(url), 60000) };
+      const row = mrow(mbtn('Télécharger', () => { const a = E('a', { href: url, download: name }); document.body.append(a); a.click(); setTimeout(() => a.remove(), 1000) }));
+      try { const f = new File([blob], name, { type: blob.type || 'application/octet-stream' }); if (navigator.share && navigator.canShare && navigator.canShare({ files: [f] })) row.append(mbtn('Partager…', () => navigator.share({ files: [f], title: name }).catch(() => { }))) } catch (e) { }
+      if (isImg && navigator.clipboard && window.ClipboardItem) row.append(mbtn('Copier l’image', async () => { try { const bm = await createImageBitmap(blob), c = cvs(bm.width, bm.height); c.getContext('2d').drawImage(bm, 0, 0); const png = await new Promise(r => c.toBlob(r, 'image/png')); await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]); say(tr('Image copiée.')) } catch (e) { say(tr('Copie impossible.')) } }));
+      const nodes = [E('div', { textContent: tr('Fichier prêt : ') + name + ' (' + Math.max(1, Math.round(blob.size / 1024)) + ' ' + tr('Ko') + ')', style: 'font-weight:bold' })];
+      if (problem) nodes.push(E('div', { textContent: problem, style: 'font-size:11px;color:#a33;white-space:pre-wrap;max-width:340px' }));
+      nodes.push(row);
+      if (isImg) nodes.push(E('img', { src: url, style: 'max-width:100%;max-height:200px;object-fit:contain;border:1px solid #888;background:#fff' }), E('div', { textContent: tr('Astuce : appuyez longuement sur l’image pour l’enregistrer ou la partager.'), style: 'font-size:11px;opacity:.8;max-width:340px' }));
+      nodes.push(E('div', { textContent: 'Android WebView: ' + /; wv\)/.test(UA) + ' · Capacitor: ' + !!window.Capacitor + ' · KollageAndroid: ' + hasSaver() + ' · ' + UA.slice(0, 90), style: 'font-size:10px;opacity:.6;max-width:340px;word-break:break-all' }), mrow(mbtn('Fermer', done)));
+      close = modal('Exporter', nodes); if (!close) alert(tr('Échec de l’enregistrement : ') + name)
+    }
+
+    // ---------- Closing the window (browser, Electron: exe / flatpak / mac)
+    window.__klClose = async () => { for (const d of [...docs]) { if (!await closeDoc(docs.indexOf(d))) return false } return true };
+    if (!/Electron/i.test(navigator.userAgent)) addEventListener('beforeunload', e => { if (docs.some(dirty)) { e.preventDefault(); e.returnValue = '' } });
+
+    // ---------- Translations of the new strings
+    Object.assign(I, { 'Normal': 'Normal', 'Retirer de la sélection': 'Remove from selection', 'Sélection inversée': 'Inverse selection', 'Mode': 'Mode', 'Brosse': 'Brush', 'Basique': 'Basic', 'Basique (taille selon la pression)': 'Basic (size follows pressure)', 'Aérographe doux': 'Soft airbrush', 'Crayon': 'Pencil', 'Force': 'Strength', 'Taille selon la vitesse (tactile)': 'Size follows speed (touch)', 'Polyligne': 'Polyline', 'Doigt': 'Finger', 'Taille de la zone de dessin…': 'Canvas size…', 'Taille de la zone de dessin': 'Canvas size', 'Inverser l’alpha': 'Invert alpha', 'Palettes…': 'Palettes…', 'Palettes': 'Palettes', 'Remplir la sélection (remplace l’alpha)': 'Fill selection (replaces alpha)', 'Ombre portée…': 'Drop shadow…', 'Ombre portée': 'Drop shadow', 'Suppression des yeux rouges…': 'Red eye removal…', 'Suppression des yeux rouges': 'Red eye removal', 'Effets pellicule Kodak…': 'Kodak film effects…', 'Effets pellicule Kodak': 'Kodak film effects', 'Remplissage selon le contenu…': 'Content-aware fill…', 'Remplissage selon le contenu': 'Content-aware fill', 'Objet': 'Object', 'Gestionnaire d’extensions…': 'Extension browser…', 'Gestionnaire d’extensions': 'Extension browser', 'Décalage X': 'Offset X', 'Décalage Y': 'Offset Y', 'Rayon d’élargissement': 'Widening radius', 'Rayon de flou': 'Blur radius', 'Opacité de l’ombre': 'Shadow opacity', 'Couleur de l’ombre': 'Shadow color', 'Conserver l’image originale': 'Keep original image', 'Oui': 'Yes', 'Non': 'No', 'Tolérance': 'Tolerance', 'Pourcentage de saturation': 'Saturation percentage', 'Pellicule': 'Film', 'Intensité': 'Intensity', 'Grain': 'Grain', 'Taille du patch (px)': 'Patch size (px)', 'Itérations': 'Iterations', 'Zone d’échantillonnage (marge px)': 'Sampling area (margin px)', 'Faites d’abord une sélection de la zone à remplir.': 'Make a selection of the area to fill first.', 'En pourcentage': 'By percentage', 'Taille absolue': 'By absolute size', 'Redimensionner :': 'Resize by:', 'Pourcentage :': 'Percentage:', 'Hauteur': 'Height', 'Conserver les proportions': 'Maintain aspect ratio', 'Ancrage :': 'Anchor:', 'Taille actuelle : ': 'Current size: ', 'Choisir cette palette': 'Choose this palette', 'Aucune palette (couleurs libres)': 'No palette (free colors)', 'Créer (vide)': 'Create (empty)', 'Copie de la sélection': 'Copy of selection', 'Depuis l’image': 'From image', 'Ajouter la couleur principale': 'Add primary color', 'Supprimer': 'Delete', 'Importer…': 'Import…', 'Exporter': 'Export', 'Fermer': 'Close', 'Ajouter…': 'Add…', 'Activer / désactiver': 'Enable / disable', 'Nom de la nouvelle palette': 'New palette name', 'Aucune extension installée.': 'No extension installed.', 'Enregistré dans Documents/Kollage : ': 'Saved in Documents/Kollage: ' });
+    Object.assign(I, { 'Exporter': 'Export', 'Télécharger': 'Download', 'Partager…': 'Share…', 'Copier l’image': 'Copy image', 'Image copiée.': 'Image copied.', 'Copie impossible.': 'Copy failed.', 'Fichier prêt : ': 'File ready: ', 'Ko': 'KB', 'Astuce : appuyez longuement sur l’image pour l’enregistrer ou la partager.': 'Tip: long-press the image to save or share it.', 'Échec de l’enregistrement automatique :': 'Automatic save failed:', 'Enregistrement annulé.': 'Save cancelled.', 'Composant natif absent : recompilez l’APK avec le html-packager.sh mis à jour.': 'Native component missing: rebuild the APK with the updated html-packager.sh.', 'Enregistré : ': 'Saved: ', 'Taille du presse-papiers': 'Clipboard size', 'Astuce : Ctrl+V dans cette fenêtre reprend la taille d’une image copiée (même depuis un site web).': 'Tip: Ctrl+V in this window takes the size of a copied image (even from a website).', 'Aucune image dans le presse-papiers.': 'No image in the clipboard.', 'Presse-papiers inaccessible : utilisez Ctrl+V dans cette fenêtre.': 'Clipboard not accessible: use Ctrl+V in this window.', 'Taille reprise du presse-papiers : ': 'Size taken from the clipboard: ', 'Décompresseur': 'Decompressor', 'Décompression automatique…': 'Automatic decompression…', 'Décompression automatique': 'Automatic decompression', 'Inclure les ondelettes': 'Include wavelets', 'Compression par palette…': 'Palette compression…', 'Compression par palette': 'Palette compression', 'Nombre de couleurs': 'Number of colors', 'Tramage': 'Dithering', 'Aucun': 'None', 'Ordonné (Bayer)': 'Ordered (Bayer)', 'Intensité du tramage': 'Dithering strength', 'Affinage de la palette (itérations)': 'Palette refinement (iterations)', 'Grille de blocs': 'Block grid', 'Automatique': 'Automatic', 'Manuelle': 'Manual', 'Manuel': 'Manual', 'Décalage horizontal (grille manuelle)': 'Horizontal offset (manual grid)', 'Décalage vertical (grille manuelle)': 'Vertical offset (manual grid)', 'Pixels corrigés de chaque côté': 'Pixels corrected on each side', 'Protection des textures': 'Texture protection', 'Rayon du filtre': 'Filter radius', 'Tolérance des halos (amplitude)': 'Halo tolerance (amplitude)', 'Mode du seuil (automatique : bruit, manuel : artefacts de compression)': 'Threshold mode (automatic: noise, manual: compression artifacts)', 'Force (seuil automatique, %)': 'Strength (automatic threshold, %)', 'Seuil luminance (manuel)': 'Luminance threshold (manual)', 'Seuil chrominance (manuel)': 'Chrominance threshold (manual)', 'Très lissé': 'Very smooth', 'Déblocage adaptatif…': 'Adaptive deblocking…', 'Déblocage adaptatif': 'Adaptive deblocking', 'Réduction des halos…': 'Ringing (halo) reduction…', 'Réduction des halos': 'Ringing (halo) reduction', 'Débruitage par ondelettes…': 'Wavelet denoising…', 'Débruitage par ondelettes': 'Wavelet denoising', 'Taille des blocs': 'Block size', 'Décalage horizontal de la grille': 'Grid horizontal offset', 'Décalage vertical de la grille': 'Grid vertical offset', 'Seuil (écart considéré comme artificiel)': 'Threshold (difference considered artificial)', 'Force': 'Strength', 'Corriger 2 pixels de chaque côté': 'Correct 2 pixels on each side', 'Seuil de contour': 'Edge threshold', 'Distance autour du contour (px)': 'Distance around the edge (px)', 'Amplitude maximale d’une oscillation': 'Maximum oscillation amplitude', 'Ondelette': 'Wavelet', 'Niveaux de décomposition': 'Decomposition levels', 'Seuil luminance': 'Luminance threshold', 'Seuil chrominance': 'Chrominance threshold', 'Seuillage': 'Thresholding', 'Doux': 'Soft', 'Dur': 'Hard', 'Qualité': 'Quality', 'Rapide': 'Fast', 'Lissé': 'Smooth', 'Tablette graphique détectée : pinceau « taille selon la pression » activé.': 'Graphics tablet detected: "size follows pressure" brush enabled.', 'Mémoire insuffisante : réduisez la sélection ou la zone d’échantillonnage.': 'Not enough memory: reduce the selection or the sampling area.', 'Extension : ': 'Extension: ', 'Fournie par une extension': 'Provided by an extension', 'Fournie par l’extension :': 'Provided by extension:', 'Pipette : cliquez sur l’image': 'Eyedropper: click on the image', 'Cliquez sur l’image pour choisir la couleur (Échap : annuler).': 'Click on the image to pick the color (Esc to cancel).', 'Pixel transparent : choisissez un pixel coloré.': 'Transparent pixel: pick a colored one.', 'Installer une extension…': 'Install an extension…', 'Exemple d’extension': 'Extension example', 'ou glissez un fichier .js dans cette fenêtre': 'or drop a .js file into this window', 'Recharger': 'Reload', 'État :': 'Status:', 'Active': 'Active', 'En erreur': 'Error', 'Désactivée': 'Disabled', 'Favori': 'Bookmark', 'Aucun résultat.': 'No results.', 'Effets et extensions': 'Effects and extensions', 'Choisissez un élément pour voir ses informations.': 'Select an item to see its information.', 'Cette extension est mémorisée et rechargée à chaque démarrage.': 'This extension is stored and reloaded at every startup.', 'Extension supprimée.': 'Extension removed.', 'Extension activée.': 'Extension enabled.', 'Extension désactivée.': 'Extension disabled.', 'Extension rechargée.': 'Extension reloaded.', 'Désactiver la palette': 'Disable palette', 'Appliquer à l’image': 'Apply to image', 'Couleurs': 'Colors', 'Nouvelle palette': 'New palette', 'Vide': 'Empty', 'Retirer la couleur': 'Remove color', 'Réinitialiser': 'Reset', 'Mots-clés': 'Keywords', 'Auteurs': 'Authors', 'Recherche par mot-clé': 'Keyword search', 'sélectionné(s)': 'selected', 'effets / extensions': 'effects / extensions', 'intégrés': 'built-in', 'extensions': 'extensions', 'Ajouter aux favoris': 'Bookmark effect', 'Retirer des favoris': 'Remove bookmark', 'Lancer l’effet': 'Run effect', 'Activer': 'Enable', 'Désactiver': 'Disable', 'Informations': 'Effect information', 'Intégrés seulement': 'Built-in only', 'Favoris seulement': 'Bookmarks only', 'Ajouter une extension…': 'Add an extension…', 'Paramètres :': 'Parameters:', 'Menu :': 'Menu:', 'Auteur :': 'Author:', 'Version :': 'Version:', 'Fichier :': 'File:', '- inconnu -': '- unknown -', 'intégré': 'built-in', 'extension': 'extension' });
+
+    window.Kollage = { version: '1.4.0', addMenuItem, addEffect, addGroup, setTool, say, onUnload: extOnUnload, installExtension: extInstall, layer: () => ({ canvas: L().c, ctx: X() }), commit: n => { render(); push(n) },  A, KRA, lzfC, lzfD, FX, T, run, setCol, render: renderNow, KOL, PDN, encode, openFile, mkProject, get doc() { return D } };
+    A.ext = () => extAdd();
     if ('launchQueue' in window) launchQueue.setConsumer(async p => { for (const h of p.files || []) { const f = await h.getFile(), e = EXT(f.name); await openFile(f, e === 'kol' || e === 'pdn' || e === 'kra' ? h : null) } });
     try { if (localStorage.getItem('kl-theme') === 'dark') document.body.classList.add('dark') } catch (e) { }
     addEventListener('resize', fitPanels); $('mb2').addEventListener('click', fitPanels);
